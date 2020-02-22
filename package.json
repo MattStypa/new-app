@@ -26,7 +26,7 @@
   },
   "scripts": {
     "prepublishOnly": "npm run build",
-    "build": "terser main.js -c -m --module -o main.min.js"
+    "build": "terser main.js -c unsafe -m toplevel -o main.min.js"
   },
   "files": [
     "main.min.js"
