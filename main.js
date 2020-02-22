@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const fs = require('fs');
 const https = require('https');
 const nodePath = require('path');
@@ -42,7 +44,7 @@ function errorHandler(error) {
   }
 
   log('For help resolving this problem please visit:');
-  log(white(package.bugs));
+  log(white(package.bugs.url));
   log();
 
   process.exit(1);
