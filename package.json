@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Create a project from a template.",
   "homepage": "https://github.com/MattStypa/new-app",
+  "bugs": "https://github.com/MattStypa/new-app/issues",
   "license": "MIT",
   "keywords": [
     "create",
@@ -21,10 +22,11 @@
   },
   "bin": "main.min.js",
   "engines": {
-    "node": ">=4.0.0"
+    "node": ">=8.0.0"
   },
   "scripts": {
-    "prepublishOnly": "terser main.js -c -m --module -o main.min.js"
+    "prepublishOnly": "npm run build",
+    "build": "terser main.js -c -m --module -o main.min.js"
   },
   "files": [
     "main.min.js"
