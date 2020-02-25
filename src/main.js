@@ -5,39 +5,38 @@ const https = require('https');
 const nodePath = require('path');
 const nodeUrl = require('url');
 const nodeUtil = require('util');
+const zlib = require('zlib');
 const package = require('./package.json');
 
 const mkdir = nodeUtil.promisify(fs.mkdir);
 const stat = nodeUtil.promisify(fs.stat);
 
-const maxSimultaneouslyDownloads = 6;
+const maxSimultaneouslyDownloads = 6; // Default for most browsers
 const userAgent = `${package.name}/${package.version} (+${package.homepage})`;
 
 const errors = {
-  projectNameRequired: () => ['Project name is required.', null, true],
-  desitnationRequired: () => ['Destination directory is required.', null, true],
-  destinationExists: (path) => ['Directory already exists.', [path]],
-  networkError: (url) => ['Network error.', [url]],
-  serverError: (url, error) => ['Server error.', [url, error]],
-  badData: () => ['Unable to read data.'],
-  repoNotFound: (repo) => ['Repository not found.', [repo]],
-  repoPathNotFound: (repo, path) => ['Repository path not found.', [`${repo}/${path}`]],
-  repoTooBig: (repo) => ['Repository is too large.', [repo]],
-  fileSystem: (path) => ['Unable to access path.', [path]],
-  cantMakeDir: (path) => ['Unable to create directory.', [path]],
-  cantWriteFile: (path) => ['Unable to write file.', [path]],
+  projectNameRequired: () => newError('Project name is required.', [], true),
+  desitnationRequired: () => newError('Destination directory is required.', [], true),
+  destinationExists: (path) => newError('Directory already exists.', [path]),
+  networkError: (url) => newError('Network error.', [url]),
+  serverError: (url, error) => newError('Server error.', [url, error]),
+  badData: () => newError('Unable to read data.'),
+  repoNotFound: (repo, hash) => newError('Repository, branch, or tag not found.', [`${repo}#${hash}`]),
+  repoPathNotFound: (repo, path) => newError('Repository path not found.', [`${repo}/${path}`]),
+  repoTooBig: (repo) => newError('Repository is too large.', [repo]),
+  fileSystem: (path) => newError('Unable to access path.', [path]),
+  cantMakeDir: (path) => newError('Unable to create directory.', [path]),
+  cantWriteFile: (path) => newError('Unable to write file.', [path]),
 };
 
 main().catch(errorHandler);
 
 function errorHandler(error) {
-  const [message, info, withHelp] = error.data || ['Unexpected error.', [error.message], false];
-
-  logError(red(message));
-  info && info.forEach((line) => logError(line));
+  logError(red(error.message));
+  error.data && error.data.forEach((line) => logError(line));
   log();
 
-  if (withHelp) {
+  if (error.withHelp) {
     log('Usage:');
     log(white('  npx new-app'), magenta('<project> <directory>'));
     log();
@@ -58,12 +57,12 @@ async function main() {
   const sourceArg = process.argv[2];
   const destArg = process.argv[3];
 
-  if (!sourceArg) throwError(errors.projectNameRequired());
-  if (!destArg) throwError(errors.desitnationRequired());
+  sourceArg || throwError(errors.projectNameRequired());
+  destArg || throwError(errors.desitnationRequired());
 
   const dest = nodePath.resolve(destArg);
 
-  if (await exists(dest)) throwError(errors.destinationExists(dest));
+  await exists(dest) && throwError(errors.destinationExists(dest));
 
   log('Please wait...');
   log();
@@ -74,18 +73,13 @@ async function main() {
   const repoPath = repoParts.slice(2).join('/');
   const repoHash = sourceParts.slice(1).join('#');
 
-  let hash = 'master';
-
-  if (!repoHash) {
-    hash = await getLatestRelease(repo) || hash;
-  }
-
+  const hash = repoHash || await getLatestRelease(repo) || 'master';
   const files = await getRepoFiles(repo, hash);
   const filteredFiles = filterFilesByPath(files, repoPath);
 
   filteredFiles.length || throwError(errors.repoPathNotFound(repo, repoPath));
 
-  await downloadFiles(files, dest);
+  await downloadFiles(filteredFiles, dest);
 
   log(cyan(repo), 'has been created in', magenta(dest));
   log();
@@ -100,7 +94,7 @@ async function getLatestRelease(repo) {
 async function getRepoFiles(repo, hash) {
   const response = await fetch(`https://api.github.com/repos/${repo}/git/trees/${hash}?recursive=1`);
 
-  response || throwError(errors.repoNotFound(repo));
+  response || throwError(errors.repoNotFound(repo, hash));
 
   const repoFiles = parseJson(response);
 
@@ -114,74 +108,77 @@ async function getRepoFiles(repo, hash) {
 
 async function downloadFiles(files, dest) {
   const queue = [...files];
+  let file;
 
-  const work = async () => {
-    const file = queue.pop();
-
-    if (!file) return;
-
-    await download(file.url, nodePath.resolve(dest, file.path));
-    await work();
+  const worker = async () => {
+    while(file = queue.pop()) {
+      await download(file.url, nodePath.resolve(dest, file.path));
+    }
   };
 
-  await Promise.all(Array(maxSimultaneouslyDownloads).fill(null).map(work));
+  await Promise.all(Array(maxSimultaneouslyDownloads).fill(null).map(worker));
+}
+
+async function fetch(url) {
+  const response = await request(url);
+
+  if (!response.found || !response.stream) return null;
+
+  let data = [];
+
+  response.stream.setEncoding('utf8')
+  response.stream.on('data', (chunk) => data.push(chunk));
+
+  await response.promise;
+  return data.join('');
 }
 
 async function download(url, filePath) {
   await makeDirectory(nodePath.dirname(filePath));
+  const response = await request(url);
 
-  const promise = new Promise((resolve, reject) => {
-    const writeStream = fs.createWriteStream(filePath);
+  response.found || throwError(errors.serverError(url, 'NotFound'));
 
-    request(url)
-      .then((result) => {
-        if (result.statusCode === 200) {
-          result.pipe(writeStream);
-          result.on('end', () => resolve());
-        } else {
-          result.resume();
-          reject(newError(errors.serverError(url, result.statusMessage)));
-        }
-      })
-      .catch(reject);
+  const writeStream = fs.createWriteStream(filePath);
+  writeStream.on('error', () => throwError(errors.cantWriteFile(filePath)));
 
-    writeStream.on('error', (error) => reject(newError(errors.cantWriteFile(filePath))));
-  });
-
-  return await promise;
-}
-
-async function fetch(url) {
-  const promise = new Promise((resolve, reject) => {
-    request(url)
-      .then((result) => {
-        if (result.statusCode === 200) {
-          const data = [];
-          result.setEncoding('utf8');
-          result.on('data', (chunk) => data.push(chunk));
-          result.on('end', () => resolve(data.join('')));
-        } else if (result.statusCode === 404){
-          result.resume();
-          resolve(null);
-        } else {
-          result.resume();
-          reject(newError(errors.serverError(url, result.statusMessage)));
-        }
-      })
-      .catch(reject);
-  });
-
-  return await promise;
+  if (response.stream) {
+    response.stream.pipe(writeStream);
+    await response.promise;
+  } else {
+    writeStream.end('');
+  }
 }
 
 async function request(url) {
-  const promise = new Promise((resolve, reject) => {
-    const options = nodeUrl.parse(url);
-    options.headers = { 'User-Agent': userAgent };
-    https.get(options, resolve).on('error', () => reject(newError(errors.networkError(url))));
+  const options = Object.assign({}, nodeUrl.parse(url), { headers: {
+    'User-Agent': userAgent,
+    'Accept-Encoding': 'gzip',
+  }});
+
+  const response = await new Promise((resolve, reject) => {
+    return https.get(options, resolve).on('error', () => reject(errors.networkError(url)));
   });
 
-  return await promise;
+  if (response.statusCode === 200 && response.headers['content-length'] !== '0') {
+    const gunzipStream = zlib.createGunzip();
+    const stream = response.pipe(gunzipStream);
+
+    const promise = new Promise((resolve, reject) => {
+      response.on('error', () => reject(errors.networkError(url)));
+      gunzipStream.on('error', () => reject(errors.networkError(url)));
+      stream.on('end', () => resolve(true));
+    });
+
+    return { found: true, stream, promise };
+  }
+
+  response.resume();
+
+  if (response.statusCode === 200) return { found: true };
+  if (response.statusCode === 404) return { found: false };
+
+  throwError(errors.serverError(url, response.statusMessage));
 }
 
 async function makeDirectory(path) {
@@ -215,12 +212,12 @@ async function exists(path) {
     return true;
   } catch(error) {
     error.code !== 'ENOENT' && throwError(errors.fileSystem(path));
+    return false;
   }
 }
 
 function filterFilesByPath(files, path) {
   const prefix = path ? `${path}/` : '';
-
   return files.filter((file) => file.path.startsWith(prefix)).map((file) => ({
     path: file.path.slice(prefix.length),
     url: file.url
@@ -259,12 +256,13 @@ function logError() {
   console.error('  ', ...arguments);
 }
 
-function newError(data) {
-  const error = new Error();
+function newError(message, data = [], withHelp = false) {
+  const error = new Error(message);
   error.data = data;
+  error.withHelp = withHelp;
   return error;
 }
 
-function throwError(data) {
-  throw newError(data);
+function throwError(error) {
+  throw error;
 }
