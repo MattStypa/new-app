@@ -71,15 +71,15 @@ async function main() {
   const repoParts = sourceParts[0].split('/').filter((part) => part);
   const repo = repoParts.slice(0, 2).join('/');
   const repoPath = repoParts.slice(2).join('/');
-  const repoHash = sourceParts.slice(1).join('#');
+  const repoHash = sourceParts[1];
 
   const hash = repoHash || await getLatestRelease(repo) || 'master';
-  const files = await getRepoFiles(repo, hash);
-  const filteredFiles = filterFilesByPath(files, repoPath);
+  const repoFiles = await getRepoFiles(repo, hash);
+  const files = filterFilesByPath(repoFiles, repoPath);
 
-  filteredFiles.length || throwError(errors.repoPathNotFound(repo, repoPath));
+  files.length || throwError(errors.repoPathNotFound(repo, repoPath));
 
-  await downloadFiles(filteredFiles, dest);
+  await downloadFiles(files, dest);
 
   log(cyan(repo), 'has been created in', magenta(dest));
   log();
@@ -88,6 +88,7 @@ async function main() {
 async function getLatestRelease(repo) {
   const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
   const latestRelease = parseJson(response);
+
   return latestRelease && latestRelease.tag_name;
 }
 
@@ -108,9 +109,10 @@ async function getRepoFiles(repo, hash) {
 
 async function downloadFiles(files, dest) {
   const queue = [...files];
-  let file;
 
   const worker = async () => {
+    let file;
+
     while(file = queue.pop()) {
       await download(file.url, nodePath.resolve(dest, file.path));
     }
@@ -130,20 +132,21 @@ async function fetch(url) {
   response.stream.on('data', (chunk) => data.push(chunk));
 
   await response.promise;
+
   return data.join('');
 }
 
 async function download(url, filePath) {
   await makeDirectory(nodePath.dirname(filePath));
+
   const response = await request(url);
 
   response.found || throwError(errors.serverError(url, 'NotFound'));
 
   const writeStream = fs.createWriteStream(filePath);
-  writeStream.on('error', () => throwError(errors.cantWriteFile(filePath)));
 
   if (response.stream) {
-    response.stream.pipe(writeStream);
+    writeStream.on('error', () => response.stream.emit('reject', errors.cantWriteFile(filePath)));
     await response.promise;
   } else {
     writeStream.end('');
@@ -167,7 +170,8 @@ async function request(url) {
     const promise = new Promise((resolve, reject) => {
       response.on('error', () => reject(errors.networkError(url)));
       gunzipStream.on('error', () => reject(errors.networkError(url)));
-      stream.on('end', () => resolve(true));
+      stream.on('reject', (error) => reject(error));
+      stream.on('end', () => resolve());
     });
 
     return { found: true, stream, promise };
@@ -218,6 +222,7 @@ async function exists(path) {
 
 function filterFilesByPath(files, path) {
   const prefix = path ? `${path}/` : '';
+
   return files.filter((file) => file.path.startsWith(prefix)).map((file) => ({
     path: file.path.slice(prefix.length),
     url: file.url
