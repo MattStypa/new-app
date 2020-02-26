@@ -1,6 +1,6 @@
 {
   "name": "new-app",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Create a project from a template.",
   "homepage": "https://github.com/MattStypa/new-app",
   "bugs": {
@@ -27,7 +27,7 @@
     "node": ">=8.0.0"
   },
   "scripts": {
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "./bin/prepublish.sh",
     "build": "terser main.js -c unsafe -m toplevel -o main.min.js",
     "start": "node main.js"
   },
