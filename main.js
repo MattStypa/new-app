@@ -146,7 +146,7 @@ async function download(url, filePath) {
   const writeStream = fs.createWriteStream(filePath);
 
   if (response.stream) {
-    writeStream.on('error', () => response.stream.emit('reject', errors.cantWriteFile(filePath)));
+    writeStream.on('error', () => response.reject(errors.cantWriteFile(filePath)));
     await response.promise;
   } else {
     writeStream.end('');
@@ -170,11 +170,10 @@ async function request(url) {
     const promise = new Promise((resolve, reject) => {
       response.on('error', () => reject(errors.networkError(url)));
       gunzipStream.on('error', () => reject(errors.networkError(url)));
-      stream.on('reject', (error) => reject(error));
       stream.on('end', () => resolve());
     });
 
-    return { found: true, stream, promise };
+    return { found: true, stream, promise, reject };
   }
 
   response.resume();
