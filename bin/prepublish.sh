@@ -9,7 +9,6 @@ read -p '- changelog'
 read -p '- readme.md documentation link'
 read -p '- package.js version'
 echo
-read -p 'Have you committed these changes?'
 read -p 'Have you published the release in GitHub?'
 
 npm run build
