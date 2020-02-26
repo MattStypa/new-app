@@ -234,7 +234,7 @@ function parseJson(str) {
 
 function defer() {
   const control = [];
-  const promise = new Promise((...args) => control.push(...args));\
+  const promise = new Promise((...args) => control.push(...args));
   return [...control, promise];
 }
 
