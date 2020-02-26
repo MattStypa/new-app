@@ -147,6 +147,7 @@ async function download(url, filePath) {
 
   if (response.stream) {
     writeStream.on('error', () => response.reject(errors.cantWriteFile(filePath)));
+    response.stream.pipe(writeStream);
     await response.promise;
   } else {
     writeStream.end('');
@@ -164,14 +165,17 @@ async function request(url) {
   });
 
   if (response.statusCode === 200 && response.headers['content-length'] !== '0') {
+    const control = [];
+    const promise = new Promise((...args) => control.push(...args));
+    const [resolve, reject] = control;
+
     const gunzipStream = zlib.createGunzip();
     const stream = response.pipe(gunzipStream);
 
-    const promise = new Promise((resolve, reject) => {
-      response.on('error', () => reject(errors.networkError(url)));
-      gunzipStream.on('error', () => reject(errors.networkError(url)));
-      stream.on('end', () => resolve());
-    });
+    response.on('error', () => reject(errors.networkError(url)));
+    gunzipStream.on('error', () => reject(errors.networkError(url)));
+    stream.on('reject', (error) => reject(error));
+    stream.on('end', () => resolve());
 
     return { found: true, stream, promise, reject };
   }
@@ -252,12 +256,12 @@ function cyan(str) {
   return '\033[1;36m' + str + '\033[0m';
 }
 
-function log() {
-  console.log('  ', ...arguments);
+function log(...args) {
+  console.log('  ', ...args);
 }
 
-function logError() {
-  console.error('  ', ...arguments);
+function logError(...args) {
+  console.error('  ', ...args);
 }
 
 function newError(message, data = [], withHelp = false) {
