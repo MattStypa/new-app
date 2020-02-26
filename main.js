@@ -146,7 +146,7 @@ async function download(url, filePath) {
   const writeStream = fs.createWriteStream(filePath);
 
   if (response.stream) {
-    response.stream.on('data', () => response.reject(errors.cantWriteFile(filePath)));
+    writeStream.on('error', () => response.reject(errors.cantWriteFile(filePath)));
     response.stream.pipe(writeStream);
     await response.promise;
   } else {
