@@ -71,9 +71,9 @@ async function main() {
   const repoParts = sourceParts[0].split('/').filter((part) => part);
   const repo = repoParts.slice(0, 2).join('/');
   const repoPath = repoParts.slice(2).join('/');
-  const repoHash = sourceParts[1];
+  const sourceHash = sourceParts[1];
 
-  const hash = repoHash || await getLatestRelease(repo) || 'master';
+  const hash = sourceHash || await getLatestRelease(repo) || 'master';
   const repoFiles = await getRepoFiles(repo, hash);
   const files = filterFilesByPath(repoFiles, repoPath);
 
@@ -88,7 +88,6 @@ async function main() {
 async function getLatestRelease(repo) {
   const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
   const latestRelease = parseJson(response);
-
   return latestRelease && latestRelease.tag_name;
 }
 
@@ -126,19 +125,17 @@ async function fetch(url) {
 
   if (!response.found || !response.stream) return null;
 
-  let data = [];
+  const data = [];
 
   response.stream.setEncoding('utf8')
   response.stream.on('data', (chunk) => data.push(chunk));
 
   await response.promise;
-
   return data.join('');
 }
 
 async function download(url, filePath) {
   await makeDirectory(nodePath.dirname(filePath));
-
   const response = await request(url);
 
   if (!response.found) throw errors.serverError(url, 'NotFound');
@@ -171,7 +168,6 @@ async function request(url) {
 
     response.on('error', () => reject(errors.networkError(url)));
     gunzipStream.on('error', () => reject(errors.networkError(url)));
-    stream.on('reject', (error) => reject(error));
     stream.on('end', () => resolve());
 
     return { found: true, stream, promise, reject };
@@ -222,7 +218,6 @@ async function exists(path) {
 
 function filterFilesByPath(files, path) {
   const prefix = path ? `${path}/` : '';
-
   return files.filter((file) => file.path.startsWith(prefix)).map((file) => ({
     path: file.path.slice(prefix.length),
     url: file.url
@@ -235,6 +230,12 @@ function parseJson(str) {
   } catch(error) {
     throw errors.badData();
   }
+}
+
+function defer() {
+  const control = [];
+  const promise = new Promise((...args) => control.push(...args));\
+  return [...control, promise];
 }
 
 function white(str) {
@@ -261,15 +262,11 @@ function logError(...args) {
   console.error('  ', ...args);
 }
 
-function defer() {
-  const control = [];
-  const promise = new Promise((...args) => control.push(...args));
-  return [...control, promise];
-}
-
 function newError(message, data = [], withHelp = false) {
   const error = new Error(message);
+
   error.data = data;
   error.withHelp = withHelp;
+
   return error;
 }
