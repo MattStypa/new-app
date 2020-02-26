@@ -57,12 +57,12 @@ async function main() {
   const sourceArg = process.argv[2];
   const destArg = process.argv[3];
 
-  sourceArg || throwError(errors.projectNameRequired());
-  destArg || throwError(errors.desitnationRequired());
+  if (!sourceArg) throw errors.projectNameRequired();
+  if (!destArg) throw errors.desitnationRequired();
 
   const dest = nodePath.resolve(destArg);
 
-  await exists(dest) && throwError(errors.destinationExists(dest));
+  if (await exists(dest)) throw errors.destinationExists(dest);
 
   log('Please wait...');
   log();
@@ -77,7 +77,7 @@ async function main() {
   const repoFiles = await getRepoFiles(repo, hash);
   const files = filterFilesByPath(repoFiles, repoPath);
 
-  files.length || throwError(errors.repoPathNotFound(repo, repoPath));
+  if (!files.length) throw errors.repoPathNotFound(repo, repoPath);
 
   await downloadFiles(files, dest);
 
@@ -95,11 +95,11 @@ async function getLatestRelease(repo) {
 async function getRepoFiles(repo, hash) {
   const response = await fetch(`https://api.github.com/repos/${repo}/git/trees/${hash}?recursive=1`);
 
-  response || throwError(errors.repoNotFound(repo, hash));
+  if (!response) throw errors.repoNotFound(repo, hash);
 
   const repoFiles = parseJson(response);
 
-  repoFiles.truncated && throwError(errors.repoTooBig());
+  if (repoFiles.truncated) throw errors.repoTooBig();
 
   return repoFiles.tree.filter((node) => node.type === 'blob').map((node) => ({
     path: node.path,
@@ -141,12 +141,12 @@ async function download(url, filePath) {
 
   const response = await request(url);
 
-  response.found || throwError(errors.serverError(url, 'NotFound'));
+  if (!response.found) throw errors.serverError(url, 'NotFound');
 
   const writeStream = fs.createWriteStream(filePath);
 
   if (response.stream) {
-    writeStream.on('error', () => response.reject(errors.cantWriteFile(filePath)));
+    response.stream.on('data', () => response.reject(errors.cantWriteFile(filePath)));
     response.stream.pipe(writeStream);
     await response.promise;
   } else {
@@ -165,12 +165,9 @@ async function request(url) {
   });
 
   if (response.statusCode === 200 && response.headers['content-length'] !== '0') {
-    const control = [];
-    const promise = new Promise((...args) => control.push(...args));
-    const [resolve, reject] = control;
-
     const gunzipStream = zlib.createGunzip();
     const stream = response.pipe(gunzipStream);
+    const [resolve, reject, promise] = defer();
 
     response.on('error', () => reject(errors.networkError(url)));
     gunzipStream.on('error', () => reject(errors.networkError(url)));
@@ -185,7 +182,7 @@ async function request(url) {
   if (response.statusCode === 200) return { found: true };
   if (response.statusCode === 404) return { found: false };
 
-  throwError(errors.serverError(url, response.statusMessage));
+  throw errors.serverError(url, response.statusMessage);
 }
 
 async function makeDirectory(path) {
@@ -208,7 +205,7 @@ async function makeDirectory(path) {
     try {
       await mkdir(paths[i - 1]);
     } catch(error) {
-      error.code !== 'EEXIST' && throwError(errors.cantMakeDir(path));
+      if (error.code !== 'EEXIST') throw errors.cantMakeDir(path);
     }
   }
 }
@@ -218,7 +215,7 @@ async function exists(path) {
     await stat(nodePath.resolve(path));
     return true;
   } catch(error) {
-    error.code !== 'ENOENT' && throwError(errors.fileSystem(path));
+    if (error.code !== 'ENOENT') throw errors.fileSystem(path);
     return false;
   }
 }
@@ -236,7 +233,7 @@ function parseJson(str) {
   try {
     return JSON.parse(str);
   } catch(error) {
-    throwError(errors.badData());
+    throw errors.badData();
   }
 }
 
@@ -264,13 +261,15 @@ function logError(...args) {
   console.error('  ', ...args);
 }
 
+function defer() {
+  const control = [];
+  const promise = new Promise((...args) => control.push(...args));
+  return [...control, promise];
+}
+
 function newError(message, data = [], withHelp = false) {
   const error = new Error(message);
   error.data = data;
   error.withHelp = withHelp;
   return error;
-}
-
-function throwError(error) {
-  throw error;
 }
