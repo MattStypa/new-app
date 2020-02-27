@@ -223,9 +223,8 @@ async function exists(path) {
 
 function filterFilesByPath(files, path) {
   const prefix = path ? `${path}/` : '';
-  return files.filter((file) => file.path.startsWith(prefix)).map((file) => ({
+  return files.filter((file) => file.path.startsWith(prefix)).map((file) => Object.assign({}, file, {
     path: file.path.slice(prefix.length),
-    url: file.url
   }));
 }
 
