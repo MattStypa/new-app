@@ -152,19 +152,12 @@ async function download(url, filePath) {
 }
 
 async function request(url) {
-  const options = Object.assign({}, nodeUrl.parse(url), { headers: {
-    'User-Agent': userAgent,
-    'Accept-Encoding': 'gzip',
-  }});
-
-  const response = await new Promise((resolve, reject) => {
-    return https.get(options, resolve).on('error', () => reject(errors.networkError(url)));
-  });
+  const response = await httpGet(url);
 
   if (response.statusCode === 200 && response.headers['content-length'] !== '0') {
+    const [resolve, reject, promise] = defer();
     const gunzipStream = zlib.createGunzip();
     const stream = response.pipe(gunzipStream);
-    const [resolve, reject, promise] = defer();
 
     response.on('error', () => reject(errors.networkError(url)));
     gunzipStream.on('error', () => reject(errors.networkError(url)));
@@ -179,6 +172,18 @@ async function request(url) {
   if (response.statusCode === 404) return { found: false };
 
   throw errors.serverError(url, response.statusMessage);
+}
+
+async function httpGet(url) {
+  const [resolve, reject, promise] = defer();
+  const options = Object.assign({}, nodeUrl.parse(url), { headers: {
+    'User-Agent': userAgent,
+    'Accept-Encoding': 'gzip',
+  }});
+
+  https.get(options, resolve).on('error', () => reject(errors.networkError(url)));
+
+  return await promise;
 }
 
 async function makeDirectory(path) {
@@ -264,9 +269,6 @@ function logError(...args) {
 
 function newError(message, data = [], withHelp = false) {
   const error = new Error(message);
-
-  error.data = data;
-  error.withHelp = withHelp;
-
+  Object.assign(error, { data, withHelp });
   return error;
 }
