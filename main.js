@@ -8,9 +8,6 @@ const nodeUtil = require('util');
 const zlib = require('zlib');
 const package = require('./package.json');
 
-const mkdir = nodeUtil.promisify(fs.mkdir);
-const stat = nodeUtil.promisify(fs.stat);
-
 const maxSimultaneouslyDownloads = 6; // Default for most browsers
 const userAgent = `${package.name}/${package.version} (+${package.homepage})`;
 
@@ -25,16 +22,16 @@ const errors = {
   repoPathNotFound: (repo, path) => newError('Repository path not found.', [`${repo}/${path}`]),
   repoTooBig: (repo) => newError('Repository is too large.', [repo]),
   fileSystem: (path) => newError('Unable to access path.', [path]),
-  cantMakeDir: (path) => newError('Unable to create directory.', [path]),
-  cantWriteFile: (path) => newError('Unable to write file.', [path]),
+  cantMakeDir: (path) => newError('Unable to create a directory.', [path]),
+  cantWriteFile: (path) => newError('Unable to write a file.', [path]),
 };
 
 main().catch(errorHandler);
 
 function errorHandler(error) {
   logError(red(error.message));
-  error.data && error.data.forEach((line) => logError(line));
-  log();
+  error.data && error.data.forEach(logError);
+  log(error);
 
   if (error.withHelp) {
     log('Usage:');
@@ -100,9 +97,9 @@ async function getRepoFiles(repo, hash) {
 
   if (repoFiles.truncated) throw errors.repoTooBig();
 
-  return repoFiles.tree.filter((node) => node.type === 'blob').map((node) => ({
-    path: node.path,
-    url: `https://raw.githubusercontent.com/${repo}/${hash}/${node.path}`,
+  return repoFiles.tree.filter((node) => node.type === 'blob').map((file) => ({
+    path: file.path,
+    url: `https://raw.githubusercontent.com/${repo}/${hash}/${file.path}`,
   }));
 }
 
@@ -121,38 +118,35 @@ async function downloadFiles(files, dest) {
 }
 
 async function fetch(url) {
-  const response = await request(url);
-
-  if (!response.found || !response.stream) return null;
-
+  const [found, stream] = await request(url);
   const data = [];
 
-  response.stream.setEncoding('utf8')
-  response.stream.on('data', (chunk) => data.push(chunk));
+  stream.setEncoding('utf8')
+  stream.on('data', (chunk) => data.push(chunk));
 
-  await response.promise;
+  await stream.promise;
   return data.join('');
 }
 
 async function download(url, filePath) {
   await makeDirectory(nodePath.dirname(filePath));
-  const response = await request(url);
+  const [found, stream] = await request(url);
 
-  if (!response.found) throw errors.serverError(url, 'NotFound');
+  if (!found) throw errors.serverError(url, 'NotFound');
 
   const writeStream = fs.createWriteStream(filePath);
 
-  if (response.stream) {
-    writeStream.on('error', () => response.reject(errors.cantWriteFile(filePath)));
-    response.stream.pipe(writeStream);
-    await response.promise;
+  if (stream) {
+    writeStream.on('error', () => stream.reject(errors.cantWriteFile(filePath)));
+    stream.pipe(writeStream);
+    await stream.promise;
   } else {
-    writeStream.end('');
+    writeStream.end();
   }
 }
 
 async function request(url) {
-  const response = await httpGet(url);
+  const response = await httpsGet(url);
 
   if (response.statusCode === 200 && response.headers['content-length'] !== '0') {
     const [resolve, reject, promise] = defer();
@@ -161,22 +155,23 @@ async function request(url) {
 
     response.on('error', () => reject(errors.networkError(url)));
     gunzipStream.on('error', () => reject(errors.networkError(url)));
-    stream.on('end', () => resolve());
+    stream.on('end', resolve);
+    Object.assign(stream, { promise, resolve, reject });
 
-    return { found: true, stream, promise, reject };
+    return [true, stream];
   }
 
   response.resume();
 
-  if (response.statusCode === 200) return { found: true };
-  if (response.statusCode === 404) return { found: false };
+  if (response.statusCode === 200) return [true, null];
+  if (response.statusCode === 404) return [false, null];
 
   throw errors.serverError(url, response.statusMessage);
 }
 
-async function httpGet(url) {
+async function httpsGet(url) {
   const [resolve, reject, promise] = defer();
-  const options = Object.assign({}, nodeUrl.parse(url), { headers: {
+  const options = Object.assign(nodeUrl.parse(url), { headers: {
     'User-Agent': userAgent,
     'Accept-Encoding': 'gzip',
   }});
@@ -204,7 +199,7 @@ async function makeDirectory(path) {
 
   for (let i = depth; i > 0; i--) {
     try {
-      await mkdir(paths[i - 1]);
+      await nodeUtil.promisify(fs.mkdir)(paths[i - 1]);
     } catch(error) {
       if (error.code !== 'EEXIST') throw errors.cantMakeDir(path);
     }
@@ -213,7 +208,7 @@ async function makeDirectory(path) {
 
 async function exists(path) {
   try {
-    await stat(nodePath.resolve(path));
+    await nodeUtil.promisify(fs.stat)(nodePath.resolve(path));
     return true;
   } catch(error) {
     if (error.code !== 'ENOENT') throw errors.fileSystem(path);
@@ -223,7 +218,7 @@ async function exists(path) {
 
 function filterFilesByPath(files, path) {
   const prefix = path ? `${path}/` : '';
-  return files.filter((file) => file.path.startsWith(prefix)).map((file) => Object.assign({}, file, {
+  return files.filter((file) => file.path.startsWith(prefix)).map((file) => Object.assign(file, {
     path: file.path.slice(prefix.length),
   }));
 }
@@ -268,6 +263,5 @@ function logError(...args) {
 
 function newError(message, data = [], withHelp = false) {
   const error = new Error(message);
-  Object.assign(error, { data, withHelp });
-  return error;
+  return Object.assign(error, { data, withHelp });
 }
