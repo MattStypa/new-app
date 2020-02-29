@@ -29,9 +29,10 @@ const errors = {
 main().catch(errorHandler);
 
 function errorHandler(error) {
+  clearLine();
   logError(red(error.message));
-  error.data && error.data.forEach(logError);
-  log(error);
+  error.data && error.data.forEach((line) => logError(line));
+  log();
 
   if (error.withHelp) {
     log('Usage:');
@@ -48,7 +49,7 @@ function errorHandler(error) {
 
 async function main() {
   log();
-  log(white(package.name), cyan(package.version));
+  log(white(package.name), package.version);
   log();
 
   const sourceArg = process.argv[2];
@@ -60,9 +61,6 @@ async function main() {
   const dest = nodePath.resolve(destArg);
 
   if (await exists(dest)) throw errors.destinationExists(dest);
-
-  log('Please wait...');
-  log();
 
   const sourceParts = sourceArg.split('#').filter((part) => part);
   const repoParts = sourceParts[0].split('/').filter((part) => part);
@@ -78,7 +76,7 @@ async function main() {
 
   await downloadFiles(files, dest);
 
-  log(cyan(repo), 'has been created in', magenta(dest));
+  log(cyan(repo) + '#' + white(hash), 'has been set up in', magenta(dest));
   log();
 }
 
@@ -105,12 +103,15 @@ async function getRepoFiles(repo, hash) {
 
 async function downloadFiles(files, dest) {
   const queue = [...files];
+  const total = queue.length;
+  const progress = progressBar(total, 30);
 
   const worker = async () => {
     let file;
 
     while(file = queue.pop()) {
       await download(file.url, nodePath.resolve(dest, file.path));
+      progress(total - queue.length);
     }
   };
 
@@ -120,6 +121,8 @@ async function downloadFiles(files, dest) {
 async function fetch(url) {
   const [found, stream] = await request(url);
   const data = [];
+
+  if (!found || !stream) return null;
 
   stream.setEncoding('utf8')
   stream.on('data', (chunk) => data.push(chunk));
@@ -235,6 +238,35 @@ function defer() {
   const control = [];
   const promise = new Promise((...args) => control.push(...args));
   return [...control, promise];
+}
+
+function progressBar(total, size) {
+  const stdout = process.stdout;
+  let last = 0;
+
+  stdout.write('\x1B[?25l'); // Hide cursor
+  stdout.write('  |' + ' '.repeat(size) + '|');
+
+  let step = (current) => {
+    if (current >= total) {
+      step = () => {} // no more steps
+      clearLine();
+    } else {
+      const next = Math.round(current / total * size);
+      stdout.cursorTo(last + 3);
+      stdout.write('•'.repeat(next - last));
+      last = next;
+    }
+  };
+
+  return (current) => step(current);
+}
+
+function clearLine() {
+  const stdout = process.stdout;
+  stdout.clearLine();
+  stdout.cursorTo(0);
+  stdout.write('\x1B[?25h'); // Show cursor
 }
 
 function white(str) {
