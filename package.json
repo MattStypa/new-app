@@ -25,16 +25,20 @@
   },
   "bin": "main.min.js",
   "engines": {
-    "node": ">=8.0.0"
+    "node": ">=8.3.0"
   },
   "scripts": {
     "prepublishOnly": "./bin/prepublish.sh",
-    "build": "terser main.js -c unsafe -m toplevel -o main.min.js"
+    "build": "terser main.js -c unsafe -m toplevel -o main.min.js",
+    "test": "jest"
   },
   "files": [
     "main.min.js"
   ],
   "devDependencies": {
     "terser": "^4.6.3"
+  },
+  "dependencies": {
+    "jest": "^25.1.0"
   }
 }

@@ -6,10 +6,10 @@ const nodePath = require('path');
 const nodeUrl = require('url');
 const nodeUtil = require('util');
 const zlib = require('zlib');
-const package = require('./package.json');
+const pkg = require('./package.json');
 
 const maxSimultaneouslyDownloads = 6; // Default for most browsers
-const userAgent = `${package.name}/${package.version} (+${package.homepage})`;
+const userAgent = `${pkg.name}/${pkg.version} (+${pkg.homepage})`;
 
 const errors = {
   projectNameRequired: () => newError('Project name is required.', [], true),
@@ -36,12 +36,12 @@ function errorHandler(error) {
 
   if (error.withHelp) {
     log('Usage:');
-    log(white('  npx new-app'), magenta('<project> <directory>'));
+    log(white('npx new-app'), magenta('<project> <directory>'));
     log();
   }
 
   log('For help resolving this problem please visit:');
-  log(white(package.bugs.url));
+  log(white(pkg.bugs.url));
   log();
 
   process.exit(1);
@@ -49,7 +49,7 @@ function errorHandler(error) {
 
 async function main() {
   log();
-  log(white(package.name), package.version);
+  log(white(pkg.name), pkg.version);
   log();
 
   const sourceArg = process.argv[2];
@@ -245,7 +245,7 @@ function progressBar(total, size) {
   let last = 0;
 
   stdout.write('\x1B[?25l'); // Hide cursor
-  stdout.write('  |' + ' '.repeat(size) + '|');
+  stdout.write('   (' + ' '.repeat(size) + ')');
 
   let step = (current) => {
     if (current >= total) {
@@ -253,7 +253,7 @@ function progressBar(total, size) {
       clearLine();
     } else {
       const next = Math.round(current / total * size);
-      stdout.cursorTo(last + 3);
+      stdout.cursorTo(last + 4);
       stdout.write('•'.repeat(next - last));
       last = next;
     }
@@ -270,19 +270,19 @@ function clearLine() {
 }
 
 function white(str) {
-  return '\033[1;37m' + str + '\033[0m';
+  return '\x1B[1;37m' + str + '\x1B[0m';
 }
 
 function red(str) {
-  return '\033[1;31m' + str + '\033[0m';
+  return '\x1B[1;31m' + str + '\x1B[0m';
 }
 
 function magenta(str) {
-  return '\033[1;35m' + str + '\033[0m';
+  return '\x1B[1;35m' + str + '\x1B[0m';
 }
 
 function cyan(str) {
-  return '\033[1;36m' + str + '\033[0m';
+  return '\x1B[1;36m' + str + '\x1B[0m';
 }
 
 function log(...args) {
