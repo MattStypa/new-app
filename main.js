@@ -10,6 +10,9 @@ const pkg = require('./package.json');
 
 const maxSimultaneouslyDownloads = 6; // Default for most browsers
 const userAgent = `${pkg.name}/${pkg.version} (+${pkg.homepage})`;
+const stdout = process.stdout;
+
+const [progressShow, progressClear, progressSet] = progressBar(30);
 
 const errors = {
   projectNameRequired: () => newError('Project name is required.', [], true),
@@ -29,9 +32,10 @@ const errors = {
 main().catch(errorHandler);
 
 function errorHandler(error) {
-  clearLine();
-  logError(red(error.message));
-  error.data && error.data.forEach((line) => logError(line));
+  progressClear();
+
+  log(red(error.message));
+  error.data && error.data.forEach((line) => log(line));
   log();
 
   if (error.withHelp) {
@@ -104,18 +108,20 @@ async function getRepoFiles(repo, hash) {
 async function downloadFiles(files, dest) {
   const queue = [...files];
   const total = queue.length;
-  const progress = progressBar(total, 30);
+  progressShow(total);
 
   const worker = async () => {
     let file;
 
     while(file = queue.pop()) {
       await download(file.url, nodePath.resolve(dest, file.path));
-      progress(total - queue.length);
+      progressSet(1 - queue.length / total);
     }
   };
 
   await Promise.all(Array(maxSimultaneouslyDownloads).fill(null).map(worker));
+
+  progressClear();
 }
 
 async function fetch(url) {
@@ -240,57 +246,61 @@ function defer() {
   return [...control, promise];
 }
 
-function progressBar(total, size) {
-  const stdout = process.stdout;
-  let last = 0;
+function progressBar(size) {
+  let current = 0;
 
-  stdout.write('\x1B[?25l'); // Hide cursor
-  stdout.write('   (' + ' '.repeat(size) + ')');
-
-  let step = (current) => {
-    if (current >= total) {
-      step = () => {} // no more steps
-      clearLine();
+  const show = () => {
+    if (stdout.isTTY) {
+      stdout.write('\x1B[?25l'); // Hide cursor
+      stdout.write('   (' + ' '.repeat(size) + ')');
     } else {
-      const next = Math.round(current / total * size);
-      stdout.cursorTo(last + 4);
-      stdout.write('•'.repeat(next - last));
-      last = next;
+      log('Please wait ...');
+      log();
     }
   };
 
-  return (current) => step(current);
-}
+  const clear = () => {
+    if (stdout.isTTY) {
+      stdout.clearLine();
+      stdout.cursorTo(0);
+      stdout.write('\x1B[?25h'); // Show cursor
+    }
+  };
 
-function clearLine() {
-  const stdout = process.stdout;
-  stdout.clearLine();
-  stdout.cursorTo(0);
-  stdout.write('\x1B[?25h'); // Show cursor
+  const set = (value) => {
+    if (stdout.isTTY) {
+      const next = Math.min(Math.round(value * size), size);
+      stdout.cursorTo(current + 4);
+      stdout.write('•'.repeat(next - current));
+      current = next;
+    }
+  };
+
+  return [show, clear, set];
 }
 
 function white(str) {
-  return '\x1B[1;37m' + str + '\x1B[0m';
+  return color('\x1B[1;37m', str);
 }
 
 function red(str) {
-  return '\x1B[1;31m' + str + '\x1B[0m';
+  return color('\x1B[1;31m', str);
 }
 
 function magenta(str) {
-  return '\x1B[1;35m' + str + '\x1B[0m';
+  return color('\x1B[1;35m', str);
 }
 
 function cyan(str) {
-  return '\x1B[1;36m' + str + '\x1B[0m';
+  return color('\x1B[1;36m', str);
+}
+
+function color(code, str) {
+  return stdout.isTTY ? code + str + '\x1B[0m' : str;
 }
 
 function log(...args) {
   console.log('  ', ...args);
-}
-
-function logError(...args) {
-  console.error('  ', ...args);
 }
 
 function newError(message, data = [], withHelp = false) {

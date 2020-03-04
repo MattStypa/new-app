@@ -1,39 +1,31 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`missing destination 1`] = `
+exports[`missing directory 1`] = `
 "  
-   [1;37mnew-app[0m 0.2.2
+   new-app 0.2.2
   
+   Destination directory is required.
   
    Usage:
-   [1;37mnpx new-app[0m [1;35m<project> <directory>[0m
+   npx new-app <project> <directory>
   
    For help resolving this problem please visit:
-   [1;37mhttps://github.com/MattStypa/new-app/issues[0m
+   https://github.com/MattStypa/new-app/issues
   
-"
-`;
-
-exports[`missing destination 2`] = `
-"   [1;31mDestination directory is required.[0m
 "
 `;
 
 exports[`missing project 1`] = `
 "  
-   [1;37mnew-app[0m 0.2.2
+   new-app 0.2.2
   
+   Project name is required.
   
    Usage:
-   [1;37mnpx new-app[0m [1;35m<project> <directory>[0m
+   npx new-app <project> <directory>
   
    For help resolving this problem please visit:
-   [1;37mhttps://github.com/MattStypa/new-app/issues[0m
+   https://github.com/MattStypa/new-app/issues
   
-"
-`;
-
-exports[`missing project 2`] = `
-"   [1;31mProject name is required.[0m
 "
 `;

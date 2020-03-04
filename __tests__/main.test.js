@@ -1,22 +1,14 @@
 const childProcess = require('child_process');
 
 test('missing project', () => {
-  const [stdout, stderr] = run();
-  expect(stdout).toMatchSnapshot();
-  expect(stderr).toMatchSnapshot();
+  runAndMatchSnapshot();
 });
 
-test('missing destination', () => {
-  const [stdout, stderr] = run('project');
-  expect(stdout).toMatchSnapshot();
-  expect(stderr).toMatchSnapshot();
+test('missing directory', () => {
+  runAndMatchSnapshot('test');
 });
 
-function run(args = '') {
-  try {
-    const result = childProcess.execSync(`node main.js ${args}`, { stdio: 'pipe' });
-    return [result.stdout.toString(), result.stderr.toString()];
-  } catch (err) {
-    return [err.stdout.toString(), err.stderr.toString()];
-  }
+function runAndMatchSnapshot(...args) {
+  const result = childProcess.spawnSync(`node`, ['main.js', ...args]);
+  expect(result.stdout.toString()).toMatchSnapshot();
 }
