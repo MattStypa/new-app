@@ -29,13 +29,14 @@
   },
   "scripts": {
     "prepublishOnly": "./bin/prepublish.sh",
-    "build": "terser main.js -c unsafe -m toplevel -o main.min.js",
+    "build": "terser main.js -c unsafe -m toplevel --toplevel -o main.min.js",
     "test": "jest"
   },
   "files": [
     "main.min.js"
   ],
   "devDependencies": {
+    "nock": "^12.0.2",
     "terser": "^4.6.3"
   },
   "dependencies": {

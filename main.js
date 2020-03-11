@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
+const http = require('http');
 const https = require('https');
 const nodePath = require('path');
 const nodeUrl = require('url');
@@ -14,22 +15,30 @@ const stdout = process.stdout;
 
 const [progressShow, progressClear, progressSet] = progressBar(30);
 
-const errors = {
-  projectNameRequired: () => newError('Project name is required.', [], true),
-  desitnationRequired: () => newError('Destination directory is required.', [], true),
-  destinationExists: (path) => newError('Directory already exists.', [path]),
-  networkError: (url) => newError('Network error.', [url]),
-  serverError: (url, error) => newError('Server error.', [url, error]),
-  badData: () => newError('Unable to read data.'),
-  repoNotFound: (repo, hash) => newError('Repository, branch, or tag not found.', [`${repo}#${hash}`]),
-  repoPathNotFound: (repo, path) => newError('Repository path not found.', [`${repo}/${path}`]),
-  repoTooBig: (repo) => newError('Repository is too large.', [repo]),
-  fileSystem: (path) => newError('Unable to access path.', [path]),
-  cantMakeDir: (path) => newError('Unable to create a directory.', [path]),
-  cantWriteFile: (path) => newError('Unable to write a file.', [path]),
-};
+const projectNameRequired = () => newError('Project name is required.', [], true);
+const desitnationRequired = () => newError('Destination directory is required.', [], true);
+const destinationExists = (path) => newError('Directory already exists.', [path]);
+const networkError = (url) => newError('Network error.', [url]);
+const serverError = (url, error) => newError('Server error.', [url, error]);
+const badData = () => newError('Unable to read data.');
+const repoNotFound = (repo, hash) => newError('Repository, branch, or tag not found.', [`${repo}#${hash}`]);
+const repoPathNotFound = (path) => newError('Repository path not found.', [path]);
+const repoEmpty = (repo, hash) => newError('Repository is empty.', [`${repo}#${hash}`]);
+const repoTooBig = (repo, hash) => newError('Repository is too large.', [`${repo}#${hash}`]);
+const fileSystem = (path) => newError('Unable to access path.', [path]);
+const cantMakeDir = (path) => newError('Unable to create a directory.', [path]);
+const cantWriteFile = (path) => newError('Unable to write a file.', [path]);
 
-main().catch(errorHandler);
+const color = (code, str) => stdout.isTTY ? `\x1B[1;${code}m${str}\x1B[0m` : str;
+const white = (str) => color(37, str);
+const red = (str) => color(31, str);
+const magenta = (str) => color(35, str);
+const cyan = (str) => color(36, str);
+
+const statusText = (code) => http.STATUS_CODES[code] || 'Unknown';
+const log = (...args) => stdout.write(['  ', ...args, '\n'].join(' '));
+
+module.exports = main().catch(errorHandler);
 
 function errorHandler(error) {
   progressClear();
@@ -59,12 +68,12 @@ async function main() {
   const sourceArg = process.argv[2];
   const destArg = process.argv[3];
 
-  if (!sourceArg) throw errors.projectNameRequired();
-  if (!destArg) throw errors.desitnationRequired();
+  if (!sourceArg) throw projectNameRequired();
+  if (!destArg) throw desitnationRequired();
 
   const dest = nodePath.resolve(destArg);
 
-  if (await exists(dest)) throw errors.destinationExists(dest);
+  if (await exists(dest)) throw destinationExists(dest);
 
   const sourceParts = sourceArg.split('#').filter((part) => part);
   const repoParts = sourceParts[0].split('/').filter((part) => part);
@@ -76,7 +85,8 @@ async function main() {
   const repoFiles = await getRepoFiles(repo, hash);
   const files = filterFilesByPath(repoFiles, repoPath);
 
-  if (!files.length) throw errors.repoPathNotFound(repo, repoPath);
+  if (!repoFiles.length) throw repoEmpty(repo, hash);
+  if (!files.length) throw repoPathNotFound(repoPath);
 
   await downloadFiles(files, dest);
 
@@ -93,11 +103,11 @@ async function getLatestRelease(repo) {
 async function getRepoFiles(repo, hash) {
   const response = await fetch(`https://api.github.com/repos/${repo}/git/trees/${hash}?recursive=1`);
 
-  if (!response) throw errors.repoNotFound(repo, hash);
+  if (!response) throw repoNotFound(repo, hash);
 
   const repoFiles = parseJson(response);
 
-  if (repoFiles.truncated) throw errors.repoTooBig();
+  if (repoFiles.truncated) throw repoTooBig(repo, hash);
 
   return repoFiles.tree.filter((node) => node.type === 'blob').map((file) => ({
     path: file.path,
@@ -141,12 +151,12 @@ async function download(url, filePath) {
   await makeDirectory(nodePath.dirname(filePath));
   const [found, stream] = await request(url);
 
-  if (!found) throw errors.serverError(url, 'NotFound');
+  if (!found) throw serverError(url, statusText(404));
 
   const writeStream = fs.createWriteStream(filePath);
 
   if (stream) {
-    writeStream.on('error', () => stream.reject(errors.cantWriteFile(filePath)));
+    writeStream.on('error', () => stream.reject(cantWriteFile(filePath)));
     stream.pipe(writeStream);
     await stream.promise;
   } else {
@@ -162,8 +172,8 @@ async function request(url) {
     const gunzipStream = zlib.createGunzip();
     const stream = response.pipe(gunzipStream);
 
-    response.on('error', () => reject(errors.networkError(url)));
-    gunzipStream.on('error', () => reject(errors.networkError(url)));
+    response.on('error', () => reject(networkError(url)));
+    gunzipStream.on('error', () => reject(networkError(url)));
     stream.on('end', resolve);
     Object.assign(stream, { promise, resolve, reject });
 
@@ -175,7 +185,7 @@ async function request(url) {
   if (response.statusCode === 200) return [true, null];
   if (response.statusCode === 404) return [false, null];
 
-  throw errors.serverError(url, response.statusMessage);
+  throw serverError(url, statusText(response.statusCode));
 }
 
 async function httpsGet(url) {
@@ -185,7 +195,7 @@ async function httpsGet(url) {
     'Accept-Encoding': 'gzip',
   }});
 
-  https.get(options, resolve).on('error', () => reject(errors.networkError(url)));
+  https.get(options, resolve).on('error', () => reject(networkError(url)));
 
   return await promise;
 }
@@ -210,7 +220,7 @@ async function makeDirectory(path) {
     try {
       await nodeUtil.promisify(fs.mkdir)(paths[i - 1]);
     } catch(error) {
-      if (error.code !== 'EEXIST') throw errors.cantMakeDir(path);
+      if (error.code !== 'EEXIST') throw cantMakeDir(path);
     }
   }
 }
@@ -220,30 +230,9 @@ async function exists(path) {
     await nodeUtil.promisify(fs.stat)(nodePath.resolve(path));
     return true;
   } catch(error) {
-    if (error.code !== 'ENOENT') throw errors.fileSystem(path);
+    if (error.code !== 'ENOENT') throw fileSystem(path);
     return false;
   }
-}
-
-function filterFilesByPath(files, path) {
-  const prefix = path ? `${path}/` : '';
-  return files.filter((file) => file.path.startsWith(prefix)).map((file) => Object.assign(file, {
-    path: file.path.slice(prefix.length),
-  }));
-}
-
-function parseJson(str) {
-  try {
-    return JSON.parse(str);
-  } catch(error) {
-    throw errors.badData();
-  }
-}
-
-function defer() {
-  const control = [];
-  const promise = new Promise((...args) => control.push(...args));
-  return [...control, promise];
 }
 
 function progressBar(size) {
@@ -279,28 +268,25 @@ function progressBar(size) {
   return [show, clear, set];
 }
 
-function white(str) {
-  return color('\x1B[1;37m', str);
+function filterFilesByPath(files, path) {
+  const prefix = path ? `${path}/` : '';
+  return files.filter((file) => file.path.startsWith(prefix)).map((file) => Object.assign(file, {
+    path: file.path.slice(prefix.length),
+  }));
 }
 
-function red(str) {
-  return color('\x1B[1;31m', str);
+function parseJson(str) {
+  try {
+    return JSON.parse(str);
+  } catch(error) {
+    throw badData();
+  }
 }
 
-function magenta(str) {
-  return color('\x1B[1;35m', str);
-}
-
-function cyan(str) {
-  return color('\x1B[1;36m', str);
-}
-
-function color(code, str) {
-  return stdout.isTTY ? code + str + '\x1B[0m' : str;
-}
-
-function log(...args) {
-  console.log('  ', ...args);
+function defer() {
+  const control = [];
+  const promise = new Promise((...args) => control.push(...args));
+  return [...control, promise];
 }
 
 function newError(message, data = [], withHelp = false) {
