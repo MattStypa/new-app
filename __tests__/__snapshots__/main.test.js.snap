@@ -134,3 +134,14 @@ exports[`010: repository path not found 1`] = `
    
 "
 `;
+
+exports[`011: download master branch 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Please wait ... 
+   
+   new/app#master has been set up in /Users/mattstypa/Code/new-app/path 
+   
+"
+`;

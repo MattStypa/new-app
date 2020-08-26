@@ -44,7 +44,9 @@ function errorHandler(error) {
   progressClear();
 
   log(red(error.message));
-  error.data && error.data.forEach((line) => log(line));
+
+  if (error.data) error.data.forEach((line) => log(line));
+  
   log();
 
   if (error.withHelp) {
@@ -97,25 +99,18 @@ async function main() {
 async function getLatestRelease(repo) {
   const url = `https://api.github.com/repos/${repo}/releases/latest`;
   const response = await fetch(url);
-
-  const latestRelease = tryCatch(
-    () => JSON.parse(response),
-    () => throwError(badData(url))
-  );
+  const latestRelease = parseJsonResponse(response, url);
 
   return latestRelease && latestRelease.tag_name;
 }
 
 async function getRepoFiles(repo, hash) {
-  const url = `https://api.github.com/repos/${repo}/git/trees/${hash}?recursive=1`;
+  const url = `https://api.github.com/repos/${repo}/git/trees/${hash}?recursive=1`
   const response = await fetch(url);
 
   if (!response) throwError(repoNotFound(repo, hash));
 
-  const repoFiles = tryCatch(
-    () => JSON.parse(response),
-    () => throwError(badData(url))
-  );
+  const repoFiles = parseJsonResponse(response, url);
 
   if (repoFiles.truncated) throwError(repoTooBig(repo, hash));
 
@@ -285,18 +280,18 @@ function filterFilesByPath(files, path) {
   }));
 }
 
+function parseJsonResponse(str, url) {
+  try {
+    return JSON.parse(str);
+  } catch (error) {
+    throw badData(url);
+  }
+}
+
 function defer() {
   const control = [];
   const promise = new Promise((...args) => control.push(...args));
   return [...control, promise];
-}
-
-function tryCatch(fn, handler) {
-  try {
-    return fn();
-  } catch (error) {
-    handler(error);
-  }
 }
 
 function throwError(error) {
