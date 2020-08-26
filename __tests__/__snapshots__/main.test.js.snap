@@ -146,3 +146,25 @@ exports[`011: repository path not found 1`] = `
    
 "
 `;
+
+exports[`012: downloads master branch repo 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Please wait ... 
+   
+   new/app#master has been set up in /Users/mattstypa/Code/new-app/path 
+   
+"
+`;
+
+exports[`013: downloads empty files 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Please wait ... 
+   
+   new/app#master has been set up in /Users/mattstypa/Code/new-app/path2 
+   
+"
+`;

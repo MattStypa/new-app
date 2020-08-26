@@ -2,7 +2,8 @@ const nock = require('nock');
 const zlib = require('zlib');
 
 let counter = 0;
-const github = nock('https://api.github.com');
+const githubApi = nock('https://api.github.com');
+const githubCdn = nock('https://raw.githubusercontent.com');
 
 const tree = [
   { type: 'blob', path: 'a.ext' },
@@ -10,6 +11,13 @@ const tree = [
   { type: 'blob', path: 'b/b/a.ext' },
   { type: 'blob', path: 'b/b/b.ext' },
 ];
+
+beforeEach(async () => {
+  githubCdn.get('/new/app/master/a.ext').reply(200, await gzip());
+  githubCdn.get('/new/app/master/b/a.ext').reply(200, await gzip('ba'));
+  githubCdn.get('/new/app/master/b/b/a.ext').reply(200, await gzip('bba'));
+  githubCdn.get('/new/app/master/b/b/b.ext').reply(200, await gzip('bbb'));
+});
 
 validate('missing project', async () => {
   return await run();
@@ -24,48 +32,48 @@ validate('directory exists', async () => {
 });
 
 validate('github network error', async () => {
-  github.get('/repos/new/app/releases/latest').replyWithError({});
+  githubApi.get('/repos/new/app/releases/latest').replyWithError({});
   return await run('new/app', 'test');
 });
 
 validate('github server error', async () => {
-  github.get('/repos/new/app/releases/latest').reply(500);
+  githubApi.get('/repos/new/app/releases/latest').reply(500);
   return await run('new/app', 'test');
 });
 
 validate('repository not found', async () => {
-  github.get('/repos/new/app/releases/latest').reply(404);
-  github.get('/repos/new/app/git/trees/master?recursive=1').reply(404);
+  githubApi.get('/repos/new/app/releases/latest').reply(404);
+  githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(404);
   return await run('new/app', 'test');
 });
 
 validate('github bad response', async () => {
-  github.get('/repos/new/app/releases/latest').reply(200, await gzip('Not JSON'));
-  return await run('new/app', 'test');
-});
-
-validate('repository not found', async () => {
-  github.get('/repos/new/app/releases/latest').reply(404);
-  github.get('/repos/new/app/git/trees/master?recursive=1').reply(404);
+  githubApi.get('/repos/new/app/releases/latest').reply(200, await gzip('Not JSON'));
   return await run('new/app', 'test');
 });
 
 validate('truncated repository', async () => {
-  github.get('/repos/new/app/releases/latest').reply(404);
-  github.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: true }));
+  githubApi.get('/repos/new/app/releases/latest').reply(404);
+  githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: true }));
   return await run('new/app', 'test');
 });
 
 validate('empty repository', async () => {
-  github.get('/repos/new/app/releases/latest').reply(404);
-  github.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree: [] }));
+  githubApi.get('/repos/new/app/releases/latest').reply(404);
+  githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree: [] }));
   return await run('new/app', 'test');
 });
 
 validate('repository path not found', async () => {
-  github.get('/repos/new/app/releases/latest').reply(404);
-  github.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree }));
+  githubApi.get('/repos/new/app/releases/latest').reply(404);
+  githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree }));
   return await run('new/app/d', 'path');
+});
+
+validate('downloads master branch repo', async () => {
+  githubApi.get('/repos/new/app/releases/latest').reply(404);
+  githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree }));
+  return await run('new/app', 'path');
 });
 
 function validate(name, fn) {
