@@ -70,12 +70,6 @@ validate('repository path not found', async () => {
   return await run('new/app/d', 'path');
 });
 
-validate('downloads master branch repo', async () => {
-  githubApi.get('/repos/new/app/releases/latest').reply(404);
-  githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree }));
-  return await run('new/app', 'path');
-});
-
 function validate(name, fn) {
   const id = `${++counter}`.padStart(3, 0);
 

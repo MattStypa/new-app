@@ -95,20 +95,7 @@ exports[`007: github bad response 1`] = `
 "
 `;
 
-exports[`008: repository not found 1`] = `
-"   
-   new-app 0.2.2 
-   
-   Repository, branch, or tag not found. 
-   new/app#master 
-   
-   For help resolving this problem please visit: 
-   https://github.com/MattStypa/new-app/issues 
-   
-"
-`;
-
-exports[`009: truncated repository 1`] = `
+exports[`008: truncated repository 1`] = `
 "   
    new-app 0.2.2 
    
@@ -121,7 +108,7 @@ exports[`009: truncated repository 1`] = `
 "
 `;
 
-exports[`010: empty repository 1`] = `
+exports[`009: empty repository 1`] = `
 "   
    new-app 0.2.2 
    
@@ -134,7 +121,7 @@ exports[`010: empty repository 1`] = `
 "
 `;
 
-exports[`011: repository path not found 1`] = `
+exports[`010: repository path not found 1`] = `
 "   
    new-app 0.2.2 
    
@@ -143,28 +130,6 @@ exports[`011: repository path not found 1`] = `
    
    For help resolving this problem please visit: 
    https://github.com/MattStypa/new-app/issues 
-   
-"
-`;
-
-exports[`012: downloads master branch repo 1`] = `
-"   
-   new-app 0.2.2 
-   
-   Please wait ... 
-   
-   new/app#master has been set up in /Users/mattstypa/Code/new-app/path 
-   
-"
-`;
-
-exports[`013: downloads empty files 1`] = `
-"   
-   new-app 0.2.2 
-   
-   Please wait ... 
-   
-   new/app#master has been set up in /Users/mattstypa/Code/new-app/path2 
    
 "
 `;

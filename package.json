@@ -30,7 +30,8 @@
   "scripts": {
     "prepublishOnly": "./bin/prepublish.sh",
     "build": "terser main.js -c unsafe -m toplevel --toplevel -o main.min.js",
-    "test": "jest"
+    "test": "jest",
+    "coverage": "jest --coverage"
   },
   "files": [
     "main.min.js"
@@ -41,5 +42,8 @@
   },
   "dependencies": {
     "jest": "^25.1.0"
+  },
+  "jest": {
+    "collectCoverageFrom": ["./main.js"]
   }
 }
