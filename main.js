@@ -20,7 +20,7 @@ const desitnationRequired = () => newError('Destination directory is required.',
 const destinationExists = (path) => newError('Directory already exists.', [path]);
 const networkError = (url) => newError('Network error.', [url]);
 const serverError = (url, error) => newError('Server error.', [url, error]);
-const badData = () => newError('Unable to read data.');
+const badData = (url) => newError('Unable to read data.', [url]);
 const repoNotFound = (repo, hash) => newError('Repository, branch, or tag not found.', [`${repo}#${hash}`]);
 const repoPathNotFound = (path) => newError('Repository path not found.', [path]);
 const repoEmpty = (repo, hash) => newError('Repository is empty.', [`${repo}#${hash}`]);
@@ -68,12 +68,12 @@ async function main() {
   const sourceArg = process.argv[2];
   const destArg = process.argv[3];
 
-  if (!sourceArg) throw projectNameRequired();
-  if (!destArg) throw desitnationRequired();
+  if (!sourceArg) throwError(projectNameRequired());
+  if (!destArg) throwError(desitnationRequired());
 
   const dest = nodePath.resolve(destArg);
 
-  if (await exists(dest)) throw destinationExists(dest);
+  if (await exists(dest)) throwError(destinationExists(dest));
 
   const sourceParts = sourceArg.split('#').filter((part) => part);
   const repoParts = sourceParts[0].split('/').filter((part) => part);
@@ -85,8 +85,8 @@ async function main() {
   const repoFiles = await getRepoFiles(repo, hash);
   const files = filterFilesByPath(repoFiles, repoPath);
 
-  if (!repoFiles.length) throw repoEmpty(repo, hash);
-  if (!files.length) throw repoPathNotFound(repoPath);
+  if (!repoFiles.length) throwError(repoEmpty(repo, hash));
+  if (!files.length) throwError(repoPathNotFound(repoPath));
 
   await downloadFiles(files, dest);
 
@@ -95,19 +95,29 @@ async function main() {
 }
 
 async function getLatestRelease(repo) {
-  const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
-  const latestRelease = parseJson(response);
+  const url = `https://api.github.com/repos/${repo}/releases/latest`;
+  const response = await fetch(url);
+
+  const latestRelease = tryCatch(
+    () => JSON.parse(response),
+    () => throwError(badData(url))
+  );
+
   return latestRelease && latestRelease.tag_name;
 }
 
 async function getRepoFiles(repo, hash) {
-  const response = await fetch(`https://api.github.com/repos/${repo}/git/trees/${hash}?recursive=1`);
+  const url = `https://api.github.com/repos/${repo}/git/trees/${hash}?recursive=1`;
+  const response = await fetch(url);
 
-  if (!response) throw repoNotFound(repo, hash);
+  if (!response) throwError(repoNotFound(repo, hash));
 
-  const repoFiles = parseJson(response);
+  const repoFiles = tryCatch(
+    () => JSON.parse(response),
+    () => throwError(badData(url))
+  );
 
-  if (repoFiles.truncated) throw repoTooBig(repo, hash);
+  if (repoFiles.truncated) throwError(repoTooBig(repo, hash));
 
   return repoFiles.tree.filter((node) => node.type === 'blob').map((file) => ({
     path: file.path,
@@ -151,7 +161,7 @@ async function download(url, filePath) {
   await makeDirectory(nodePath.dirname(filePath));
   const [found, stream] = await request(url);
 
-  if (!found) throw serverError(url, statusText(404));
+  if (!found) throwError(serverError(url, statusText(404)));
 
   const writeStream = fs.createWriteStream(filePath);
 
@@ -185,7 +195,7 @@ async function request(url) {
   if (response.statusCode === 200) return [true, null];
   if (response.statusCode === 404) return [false, null];
 
-  throw serverError(url, statusText(response.statusCode));
+  throwError(serverError(url, statusText(response.statusCode)));
 }
 
 async function httpsGet(url) {
@@ -220,7 +230,7 @@ async function makeDirectory(path) {
     try {
       await nodeUtil.promisify(fs.mkdir)(paths[i - 1]);
     } catch(error) {
-      if (error.code !== 'EEXIST') throw cantMakeDir(path);
+      if (error.code !== 'EEXIST') throwError(cantMakeDir(path));
     }
   }
 }
@@ -230,7 +240,7 @@ async function exists(path) {
     await nodeUtil.promisify(fs.stat)(nodePath.resolve(path));
     return true;
   } catch(error) {
-    if (error.code !== 'ENOENT') throw fileSystem(path);
+    if (error.code !== 'ENOENT') throwError(fileSystem(path));
     return false;
   }
 }
@@ -275,18 +285,22 @@ function filterFilesByPath(files, path) {
   }));
 }
 
-function parseJson(str) {
-  try {
-    return JSON.parse(str);
-  } catch(error) {
-    throw badData();
-  }
-}
-
 function defer() {
   const control = [];
   const promise = new Promise((...args) => control.push(...args));
   return [...control, promise];
+}
+
+function tryCatch(fn, handler) {
+  try {
+    return fn();
+  } catch (error) {
+    handler(error);
+  }
+}
+
+function throwError(error) {
+  throw error;
 }
 
 function newError(message, data = [], withHelp = false) {

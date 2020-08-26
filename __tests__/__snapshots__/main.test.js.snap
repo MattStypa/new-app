@@ -70,12 +70,12 @@ exports[`005: github server error 1`] = `
 "
 `;
 
-exports[`006: repository not found 1`] = `
+exports[`006: github bad response 1`] = `
 "   
    new-app 0.2.2 
    
-   Repository, branch, or tag not found. 
-   new/app#master 
+   Unable to read data. 
+   https://api.github.com/repos/new/app/releases/latest 
    
    For help resolving this problem please visit: 
    https://github.com/MattStypa/new-app/issues 
@@ -83,11 +83,12 @@ exports[`006: repository not found 1`] = `
 "
 `;
 
-exports[`007: github bad response 1`] = `
+exports[`007: repository not found 1`] = `
 "   
    new-app 0.2.2 
    
-   Unable to read data. 
+   Repository, branch, or tag not found. 
+   new/app#master 
    
    For help resolving this problem please visit: 
    https://github.com/MattStypa/new-app/issues 
