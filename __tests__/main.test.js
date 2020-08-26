@@ -1,11 +1,13 @@
 const nock = require('nock');
 const zlib = require('zlib');
 
+const childProcess = require('child_process');
+
 let counter = 0;
 const githubApi = nock('https://api.github.com');
 const githubCdn = nock('https://raw.githubusercontent.com');
 
-const tree = [
+const repoTree = [
   { type: 'blob', path: 'a.ext' },
   { type: 'blob', path: 'b/a.ext' },
   { type: 'blob', path: 'b/b/a.ext' },
@@ -66,8 +68,18 @@ validate('empty repository', async () => {
 
 validate('repository path not found', async () => {
   githubApi.get('/repos/new/app/releases/latest').reply(404);
-  githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree }));
+  githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree: repoTree }));
   return await run('new/app/d', 'path');
+});
+
+validate('downloads default branch', async () => {
+  githubApi.get('/repos/new/app/releases/latest').reply(404);
+  githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree: repoTree }));
+
+  return [
+    await run('new/app', '__temp__'),
+    await exec('ls -R __temp__'),
+  ];
 });
 
 function validate(name, fn) {
@@ -100,4 +112,12 @@ async function run(...args) {
   Object.assign(process.stdout, originals);
 
   return mocks.write.mock.calls.map((args) => args.join(' ')).join('');
+}
+
+async function exec(cmd) {
+  return await new Promise((resolve, reject) => {
+    childProcess.exec(cmd, (error, stdout, stderr) => {
+      !error ? resolve(stdout) : reject(stderr);
+    });
+  });
 }

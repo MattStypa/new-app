@@ -135,13 +135,26 @@ exports[`010: repository path not found 1`] = `
 "
 `;
 
-exports[`011: download master branch 1`] = `
-"   
+exports[`011: downloads default branch 1`] = `
+Array [
+  "   
    new-app 0.2.2 
    
    Please wait ... 
    
-   new/app#master has been set up in /Users/mattstypa/Code/new-app/path 
+   new/app#master has been set up in /Users/mattstypa/Code/new-app/__temp__ 
    
-"
+",
+  "a.ext
+b
+
+__temp__/b:
+a.ext
+b
+
+__temp__/b/b:
+a.ext
+b.ext
+",
+]
 `;
