@@ -1,7 +1,14 @@
-const nock = require('nock');
+const childProcess = require('child_process');
+const fs = require('fs');
 const zlib = require('zlib');
 
-const childProcess = require('child_process');
+const nock = require('nock');
+
+const mockFs = require('../__mocks__/fs.js');
+
+fs.createWriteStream = mockFs.createWriteStream;
+fs.mkdir = mockFs.mkdir;
+fs.stat = mockFs.stat;
 
 let counter = 0;
 const githubApi = nock('https://api.github.com');
@@ -21,6 +28,10 @@ beforeEach(async () => {
   githubCdn.get('/new/app/master/b/b/b.ext').reply(200, await gzip('bbb'));
 });
 
+afterEach(() => {
+  mockFs.reset();
+});
+
 validate('missing project', async () => {
   return await run();
 });
@@ -30,56 +41,57 @@ validate('missing directory', async () => {
 });
 
 validate('directory exists', async () => {
-  return await run('mattstypa/new-app', '__tests__');
+  mockFs.mkdir('/test', () => {});
+  return await run('mattstypa/new-app', '/test');
 });
 
 validate('github network error', async () => {
   githubApi.get('/repos/new/app/releases/latest').replyWithError({});
-  return await run('new/app', 'test');
+  return await run('new/app', '/test');
 });
 
 validate('github server error', async () => {
   githubApi.get('/repos/new/app/releases/latest').reply(500);
-  return await run('new/app', 'test');
+  return await run('new/app', '/test');
 });
 
 validate('github bad response', async () => {
   githubApi.get('/repos/new/app/releases/latest').reply(200, await gzip('Not JSON'));
-  return await run('new/app', 'test');
+  return await run('new/app', '/test');
 });
 
 validate('repository not found', async () => {
   githubApi.get('/repos/new/app/releases/latest').reply(404);
   githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(404);
-  return await run('new/app', 'test');
+  return await run('new/app', '/test');
 });
 
 validate('truncated repository', async () => {
   githubApi.get('/repos/new/app/releases/latest').reply(404);
   githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: true }));
-  return await run('new/app', 'test');
+  return await run('new/app', '/test');
 });
 
 validate('empty repository', async () => {
   githubApi.get('/repos/new/app/releases/latest').reply(404);
   githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree: [] }));
-  return await run('new/app', 'test');
+  return await run('new/app', '/test');
 });
 
 validate('repository path not found', async () => {
   githubApi.get('/repos/new/app/releases/latest').reply(404);
   githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree: repoTree }));
-  return await run('new/app/d', 'path');
+  return await run('new/app/d', '/path');
 });
 
 validate('downloads default branch', async () => {
   githubApi.get('/repos/new/app/releases/latest').reply(404);
   githubApi.get('/repos/new/app/git/trees/master?recursive=1').reply(200, await gzipJson({ truncated: false, tree: repoTree }));
 
-  return [
-    await run('new/app', '__temp__'),
-    await exec('ls -R __temp__'),
-  ];
+  const result = await run('new/app', '/test');
+  const fileSystem = mockFs.getFileSystem();
+
+  return { result, fileSystem };
 });
 
 function validate(name, fn) {

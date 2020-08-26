@@ -35,7 +35,7 @@ exports[`003: directory exists 1`] = `
    new-app 0.2.2 
    
    Directory already exists. 
-   /Users/mattstypa/Code/new-app/__tests__ 
+   /test 
    
    For help resolving this problem please visit: 
    https://github.com/MattStypa/new-app/issues 
@@ -136,25 +136,22 @@ exports[`010: repository path not found 1`] = `
 `;
 
 exports[`011: downloads default branch 1`] = `
-Array [
-  "   
+Object {
+  "fileSystem": Object {
+    "/test/a.ext": "",
+    "/test/b": Array [],
+    "/test/b/a.ext": "ba",
+    "/test/b/b": Array [],
+    "/test/b/b/a.ext": "bba",
+    "/test/b/b/b.ext": "bbb",
+  },
+  "result": "   
    new-app 0.2.2 
    
    Please wait ... 
    
-   new/app#master has been set up in /Users/mattstypa/Code/new-app/__temp__ 
+   new/app#master has been set up in /test 
    
 ",
-  "a.ext
-b
-
-__temp__/b:
-a.ext
-b
-
-__temp__/b/b:
-a.ext
-b.ext
-",
-]
+}
 `;

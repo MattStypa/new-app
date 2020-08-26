@@ -46,7 +46,7 @@ function errorHandler(error) {
   log(red(error.message));
 
   if (error.data) error.data.forEach((line) => log(line));
-  
+
   log();
 
   if (error.withHelp) {
@@ -225,6 +225,7 @@ async function makeDirectory(path) {
     try {
       await nodeUtil.promisify(fs.mkdir)(paths[i - 1]);
     } catch(error) {
+      console.log({error});
       if (error.code !== 'EEXIST') throwError(cantMakeDir(path));
     }
   }
