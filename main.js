@@ -255,6 +255,7 @@ async function exists(path) {
   }
 }
 
+/* istanbul ignore next */
 function progressBar(size) {
   let current = 0;
 

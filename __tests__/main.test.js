@@ -22,7 +22,7 @@ const repoTree = [
 ];
 
 beforeEach(async () => {
-  githubCdn.get('/new/app/mainBranch/a.ext').reply(200, await gzip());
+  githubCdn.get('/new/app/mainBranch/a.ext').reply(200, await gzip(), { 'Content-Length': '0' });
   githubCdn.get('/new/app/mainBranch/b/a.ext').reply(200, await gzip('ba'));
   githubCdn.get('/new/app/mainBranch/b/b/a.ext').reply(200, await gzip('bba'));
   githubCdn.get('/new/app/mainBranch/b/b/b.ext').reply(200, await gzip('bbb'));
@@ -98,6 +98,15 @@ validate('download default branch', async () => {
   githubApi.get('/repos/new/app/git/trees/mainBranch?recursive=1').reply(200, await gzipJson({ truncated: false, tree: repoTree }));
 
   const result = await run('new/app', '/test');
+  const fileSystem = mockFs.getFileSystem();
+
+  return { result, fileSystem };
+});
+
+validate('download specified branch', async () => {
+  githubApi.get('/repos/new/app/git/trees/mainBranch?recursive=1').reply(200, await gzipJson({ truncated: false, tree: repoTree }));
+
+  const result = await run('new/app#mainBranch', '/test');
   const fileSystem = mockFs.getFileSystem();
 
   return { result, fileSystem };
