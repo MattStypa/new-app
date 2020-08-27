@@ -21,7 +21,8 @@ const destinationExists = (path) => newError('Directory already exists.', [path]
 const networkError = (url) => newError('Network error.', [url]);
 const serverError = (url, error) => newError('Server error.', [url, error]);
 const badData = (url) => newError('Unable to read data.', [url]);
-const repoNotFound = (repo, hash) => newError('Repository, branch, or tag not found.', [`${repo}#${hash}`]);
+const repoNotFound = (repo) => newError('Repository not found.', [repo]);
+const repoHashNotFound = (repo, hash) => newError('Repository branch, or tag not found.', [`${repo}#${hash}`]);
 const repoPathNotFound = (path) => newError('Repository path not found.', [path]);
 const repoEmpty = (repo, hash) => newError('Repository is empty.', [`${repo}#${hash}`]);
 const repoTooBig = (repo, hash) => newError('Repository is too large.', [`${repo}#${hash}`]);
@@ -83,7 +84,10 @@ async function main() {
   const repoPath = repoParts.slice(2).join('/');
   const sourceHash = sourceParts[1];
 
-  const hash = sourceHash || await getLatestRelease(repo) || 'master';
+  const hash = sourceHash
+    || await getLatestRelease(repo)
+    || await getDefaultBranch(repo);
+
   const repoFiles = await getRepoFiles(repo, hash);
   const files = filterFilesByPath(repoFiles, repoPath);
 
@@ -104,11 +108,22 @@ async function getLatestRelease(repo) {
   return latestRelease && latestRelease.tag_name;
 }
 
+async function getDefaultBranch(repo) {
+  const url = `https://api.github.com/repos/${repo}`;
+  const response = await fetch(url);
+
+  if (!response) throwError(repoNotFound(repo));
+
+  const repoProps = parseJsonResponse(response, url);
+
+  return repoProps && repoProps.default_branch;
+}
+
 async function getRepoFiles(repo, hash) {
   const url = `https://api.github.com/repos/${repo}/git/trees/${hash}?recursive=1`
   const response = await fetch(url);
 
-  if (!response) throwError(repoNotFound(repo, hash));
+  if (!response) throwError(repoHashNotFound(repo, hash));
 
   const repoFiles = parseJsonResponse(response, url);
 

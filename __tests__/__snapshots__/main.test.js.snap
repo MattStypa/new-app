@@ -87,8 +87,8 @@ exports[`007: repository not found 1`] = `
 "   
    new-app 0.2.2 
    
-   Repository, branch, or tag not found. 
-   new/app#master 
+   Repository not found. 
+   new/app 
    
    For help resolving this problem please visit: 
    https://github.com/MattStypa/new-app/issues 
@@ -96,12 +96,25 @@ exports[`007: repository not found 1`] = `
 "
 `;
 
-exports[`008: truncated repository 1`] = `
+exports[`008: repository branch not found 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Repository branch, or tag not found. 
+   new/app#notFound 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`009: truncated repository 1`] = `
 "   
    new-app 0.2.2 
    
    Repository is too large. 
-   new/app#master 
+   new/app#mainBranch 
    
    For help resolving this problem please visit: 
    https://github.com/MattStypa/new-app/issues 
@@ -109,12 +122,12 @@ exports[`008: truncated repository 1`] = `
 "
 `;
 
-exports[`009: empty repository 1`] = `
+exports[`010: empty repository 1`] = `
 "   
    new-app 0.2.2 
    
    Repository is empty. 
-   new/app#master 
+   new/app#mainBranch 
    
    For help resolving this problem please visit: 
    https://github.com/MattStypa/new-app/issues 
@@ -122,7 +135,7 @@ exports[`009: empty repository 1`] = `
 "
 `;
 
-exports[`010: repository path not found 1`] = `
+exports[`011: repository path not found 1`] = `
 "   
    new-app 0.2.2 
    
@@ -135,7 +148,7 @@ exports[`010: repository path not found 1`] = `
 "
 `;
 
-exports[`011: downloads default branch 1`] = `
+exports[`012: download default branch 1`] = `
 Object {
   "fileSystem": Object {
     "/test/a.ext": "",
@@ -150,7 +163,7 @@ Object {
    
    Please wait ... 
    
-   new/app#master has been set up in /test 
+   new/app#mainBranch has been set up in /test 
    
 ",
 }
