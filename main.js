@@ -240,7 +240,6 @@ async function makeDirectory(path) {
     try {
       await nodeUtil.promisify(fs.mkdir)(paths[i - 1]);
     } catch(error) {
-      console.log({error});
       if (error.code !== 'EEXIST') throwError(cantMakeDir(path));
     }
   }
