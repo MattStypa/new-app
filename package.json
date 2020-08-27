@@ -31,7 +31,7 @@
     "prepublishOnly": "./bin/prepublish.sh",
     "build": "terser main.js -c unsafe -m toplevel --toplevel -o main.min.js",
     "test": "jest",
-    "coverage": "jest --coverage"
+    "coverage": "jest --coverage --coverageDirectory=./coverage"
   },
   "files": [
     "main.min.js"

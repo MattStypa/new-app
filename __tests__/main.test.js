@@ -103,10 +103,20 @@ validate('download default branch', async () => {
   return { result, fileSystem };
 });
 
-validate('download specified branch', async () => {
+validate('download specific branch', async () => {
   githubApi.get('/repos/new/app/git/trees/mainBranch?recursive=1').reply(200, await gzipJson({ truncated: false, tree: repoTree }));
 
   const result = await run('new/app#mainBranch', '/test');
+  const fileSystem = mockFs.getFileSystem();
+
+  return { result, fileSystem };
+});
+
+validate('download latest release', async () => {
+  githubApi.get('/repos/new/app/releases/latest').reply(200, await gzipJson({ tag_name: 'mainBranch' }));
+  githubApi.get('/repos/new/app/git/trees/mainBranch?recursive=1').reply(200, await gzipJson({ truncated: false, tree: repoTree }));
+
+  const result = await run('new/app', '/test');
   const fileSystem = mockFs.getFileSystem();
 
   return { result, fileSystem };

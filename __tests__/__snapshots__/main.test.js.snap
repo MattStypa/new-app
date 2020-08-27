@@ -169,7 +169,28 @@ Object {
 }
 `;
 
-exports[`013: download specified branch 1`] = `
+exports[`013: download specific branch 1`] = `
+Object {
+  "fileSystem": Object {
+    "/test/a.ext": "",
+    "/test/b": Array [],
+    "/test/b/a.ext": "ba",
+    "/test/b/b": Array [],
+    "/test/b/b/a.ext": "bba",
+    "/test/b/b/b.ext": "bbb",
+  },
+  "result": "   
+   new-app 0.2.2 
+   
+   Please wait ... 
+   
+   new/app#mainBranch has been set up in /test 
+   
+",
+}
+`;
+
+exports[`014: download latest release 1`] = `
 Object {
   "fileSystem": Object {
     "/test/a.ext": "",
