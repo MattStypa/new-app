@@ -151,10 +151,10 @@ exports[`011: repository path not found 1`] = `
 exports[`012: download default branch 1`] = `
 Object {
   "fileSystem": Object {
+    "/test": Array [],
     "/test/a.ext": "",
     "/test/b": Array [],
     "/test/b/a.ext": "ba",
-    "/test/b/b": Array [],
     "/test/b/b/a.ext": "bba",
     "/test/b/b/b.ext": "bbb",
   },
@@ -172,10 +172,10 @@ Object {
 exports[`013: download specific branch 1`] = `
 Object {
   "fileSystem": Object {
+    "/test": Array [],
     "/test/a.ext": "",
     "/test/b": Array [],
     "/test/b/a.ext": "ba",
-    "/test/b/b": Array [],
     "/test/b/b/a.ext": "bba",
     "/test/b/b/b.ext": "bbb",
   },
@@ -193,10 +193,10 @@ Object {
 exports[`014: download latest release 1`] = `
 Object {
   "fileSystem": Object {
+    "/test": Array [],
     "/test/a.ext": "",
     "/test/b": Array [],
     "/test/b/a.ext": "ba",
-    "/test/b/b": Array [],
     "/test/b/b/a.ext": "bba",
     "/test/b/b/b.ext": "bbb",
   },
@@ -209,4 +209,32 @@ Object {
    
 ",
 }
+`;
+
+exports[`015: unable to access file system 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Unable to access path. 
+   /test 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`016: unable to create directory 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Please wait ... 
+   
+   Unable to create a directory. 
+   /test 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
 `;

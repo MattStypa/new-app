@@ -6,10 +6,6 @@ const nock = require('nock');
 
 const mockFs = require('../__mocks__/fs.js');
 
-fs.createWriteStream = mockFs.createWriteStream;
-fs.mkdir = mockFs.mkdir;
-fs.stat = mockFs.stat;
-
 let counter = 0;
 const githubApi = nock('https://api.github.com');
 const githubCdn = nock('https://raw.githubusercontent.com');
@@ -22,6 +18,10 @@ const repoTree = [
 ];
 
 beforeEach(async () => {
+  fs.createWriteStream = mockFs.createWriteStream;
+  fs.mkdir = mockFs.mkdir;
+  fs.stat = mockFs.stat;
+
   githubCdn.get('/new/app/mainBranch/a.ext').reply(200, await gzip(), { 'Content-Length': '0' });
   githubCdn.get('/new/app/mainBranch/b/a.ext').reply(200, await gzip('ba'));
   githubCdn.get('/new/app/mainBranch/b/b/a.ext').reply(200, await gzip('bba'));
@@ -120,6 +120,20 @@ validate('download latest release', async () => {
   const fileSystem = mockFs.getFileSystem();
 
   return { result, fileSystem };
+});
+
+validate('unable to access file system', async () => {
+  fs.stat = jest.fn((path, callback) => callback({ code: 'EACCES' }));
+
+  return await run('mattstypa/new-app', '/test');
+});
+
+validate('unable to create directory', async () => {
+  fs.mkdir = jest.fn((path, callback) => callback({ code: 'EACCES' }));
+
+  githubApi.get('/repos/new/app/git/trees/mainBranch?recursive=1').reply(200, await gzipJson({ truncated: false, tree: repoTree }));
+
+  return await run('new/app#mainBranch', '/test');
 });
 
 function validate(name, fn) {

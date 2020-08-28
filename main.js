@@ -30,6 +30,7 @@ const fileSystem = (path) => newError('Unable to access path.', [path]);
 const cantMakeDir = (path) => newError('Unable to create a directory.', [path]);
 const cantWriteFile = (path) => newError('Unable to write a file.', [path]);
 
+/* istanbul ignore next */
 const color = (code, str) => stdout.isTTY ? `\x1B[1;${code}m${str}\x1B[0m` : str;
 const white = (str) => color(37, str);
 const red = (str) => color(31, str);
@@ -237,10 +238,12 @@ async function makeDirectory(path) {
   if (!depth) return;
 
   for (let i = depth; i > 0; i--) {
+    const currentPath = paths[i];
+
     try {
-      await nodeUtil.promisify(fs.mkdir)(paths[i - 1]);
+      await nodeUtil.promisify(fs.mkdir)(currentPath);
     } catch(error) {
-      if (error.code !== 'EEXIST') throwError(cantMakeDir(path));
+      if (error.code !== 'EEXIST') throwError(cantMakeDir(currentPath));
     }
   }
 }

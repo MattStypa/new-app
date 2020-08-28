@@ -16,7 +16,7 @@ function mkdir(path, callback) {
 }
 
 function stat(path, callback) {
-  callback(fileSystem.hasOwnProperty(path) ? false : {code: 'ENOENT'});
+  callback(fileSystem.hasOwnProperty(path) ? false : { code: 'ENOENT' });
 }
 
 function reset() {
@@ -25,10 +25,6 @@ function reset() {
 
 function getFileSystem() {
   return fileSystem;
-}
-
-function getPath(path) {
-
 }
 
 module.exports = {
