@@ -1,0 +1,240 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`001: missing project 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Project name is required. 
+   
+   Usage: 
+   npx new-app <project> <directory> 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`002: missing directory 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Destination directory is required. 
+   
+   Usage: 
+   npx new-app <project> <directory> 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`003: directory exists 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Directory already exists. 
+   /test 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`004: github network error 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Network error. 
+   https://api.github.com/repos/new/app/releases/latest 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`005: github server error 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Server error. 
+   https://api.github.com/repos/new/app/releases/latest 
+   Internal Server Error 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`006: github bad response 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Unable to read data. 
+   https://api.github.com/repos/new/app/releases/latest 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`007: repository not found 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Repository not found. 
+   new/app 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`008: repository branch not found 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Repository branch, or tag not found. 
+   new/app#notFound 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`009: truncated repository 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Repository is too large. 
+   new/app#mainBranch 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`010: empty repository 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Repository is empty. 
+   new/app#mainBranch 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`011: repository path not found 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Repository path not found. 
+   d 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`012: download default branch 1`] = `
+Object {
+  "fileSystem": Object {
+    "/test": Array [],
+    "/test/a.ext": "",
+    "/test/b": Array [],
+    "/test/b/a.ext": "ba",
+    "/test/b/b/a.ext": "bba",
+    "/test/b/b/b.ext": "bbb",
+  },
+  "result": "   
+   new-app 0.2.2 
+   
+   Please wait ... 
+   
+   new/app#mainBranch has been set up in /test 
+   
+",
+}
+`;
+
+exports[`013: download specific branch 1`] = `
+Object {
+  "fileSystem": Object {
+    "/test": Array [],
+    "/test/a.ext": "",
+    "/test/b": Array [],
+    "/test/b/a.ext": "ba",
+    "/test/b/b/a.ext": "bba",
+    "/test/b/b/b.ext": "bbb",
+  },
+  "result": "   
+   new-app 0.2.2 
+   
+   Please wait ... 
+   
+   new/app#mainBranch has been set up in /test 
+   
+",
+}
+`;
+
+exports[`014: download latest release 1`] = `
+Object {
+  "fileSystem": Object {
+    "/test": Array [],
+    "/test/a.ext": "",
+    "/test/b": Array [],
+    "/test/b/a.ext": "ba",
+    "/test/b/b/a.ext": "bba",
+    "/test/b/b/b.ext": "bbb",
+  },
+  "result": "   
+   new-app 0.2.2 
+   
+   Please wait ... 
+   
+   new/app#mainBranch has been set up in /test 
+   
+",
+}
+`;
+
+exports[`015: unable to access file system 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Unable to access path. 
+   /test 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;
+
+exports[`016: unable to create directory 1`] = `
+"   
+   new-app 0.2.2 
+   
+   Please wait ... 
+   
+   Unable to create a directory. 
+   /test 
+   
+   For help resolving this problem please visit: 
+   https://github.com/MattStypa/new-app/issues 
+   
+"
+`;

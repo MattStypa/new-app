@@ -1,6 +1,6 @@
 {
   "name": "new-app",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Create a project from a template.",
   "homepage": "https://github.com/MattStypa/new-app",
   "bugs": {
@@ -9,6 +9,7 @@
   "license": "MIT",
   "keywords": [
     "create",
+    "make",
     "template",
     "scaffolding",
     "blueprint"
@@ -24,17 +25,25 @@
   },
   "bin": "main.min.js",
   "engines": {
-    "node": ">=8.0.0"
+    "node": ">=8.3.0"
   },
   "scripts": {
     "prepublishOnly": "./bin/prepublish.sh",
-    "build": "terser main.js -c unsafe -m toplevel -o main.min.js",
-    "start": "node main.js"
+    "build": "terser main.js -c unsafe -m toplevel --toplevel -o main.min.js",
+    "test": "jest",
+    "coverage": "jest --coverage --coverageDirectory=./coverage"
   },
   "files": [
     "main.min.js"
   ],
   "devDependencies": {
-    "terser": "^4.6.3"
+    "jest": "^26.4.2",
+    "nock": "^13.0.4",
+    "terser": "^5.2.1"
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "./main.js"
+    ]
   }
 }

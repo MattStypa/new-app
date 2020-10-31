@@ -1,49 +1,64 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
+const http = require('http');
 const https = require('https');
 const nodePath = require('path');
 const nodeUrl = require('url');
 const nodeUtil = require('util');
 const zlib = require('zlib');
-const package = require('./package.json');
-
-const mkdir = nodeUtil.promisify(fs.mkdir);
-const stat = nodeUtil.promisify(fs.stat);
+const pkg = require('./package.json');
 
 const maxSimultaneouslyDownloads = 6; // Default for most browsers
-const userAgent = `${package.name}/${package.version} (+${package.homepage})`;
+const userAgent = `${pkg.name}/${pkg.version} (+${pkg.homepage})`;
+const stdout = process.stdout;
 
-const errors = {
-  projectNameRequired: () => newError('Project name is required.', [], true),
-  desitnationRequired: () => newError('Destination directory is required.', [], true),
-  destinationExists: (path) => newError('Directory already exists.', [path]),
-  networkError: (url) => newError('Network error.', [url]),
-  serverError: (url, error) => newError('Server error.', [url, error]),
-  badData: () => newError('Unable to read data.'),
-  repoNotFound: (repo, hash) => newError('Repository, branch, or tag not found.', [`${repo}#${hash}`]),
-  repoPathNotFound: (repo, path) => newError('Repository path not found.', [`${repo}/${path}`]),
-  repoTooBig: (repo) => newError('Repository is too large.', [repo]),
-  fileSystem: (path) => newError('Unable to access path.', [path]),
-  cantMakeDir: (path) => newError('Unable to create directory.', [path]),
-  cantWriteFile: (path) => newError('Unable to write file.', [path]),
-};
+const [progressShow, progressClear, progressSet] = progressBar(30);
 
-main().catch(errorHandler);
+const projectNameRequired = () => newError('Project name is required.', [], true);
+const desitnationRequired = () => newError('Destination directory is required.', [], true);
+const destinationExists = (path) => newError('Directory already exists.', [path]);
+const networkError = (url) => newError('Network error.', [url]);
+const serverError = (url, error) => newError('Server error.', [url, error]);
+const badData = (url) => newError('Unable to read data.', [url]);
+const repoNotFound = (repo) => newError('Repository not found.', [repo]);
+const repoHashNotFound = (repo, hash) => newError('Repository branch, or tag not found.', [`${repo}#${hash}`]);
+const repoPathNotFound = (path) => newError('Repository path not found.', [path]);
+const repoEmpty = (repo, hash) => newError('Repository is empty.', [`${repo}#${hash}`]);
+const repoTooBig = (repo, hash) => newError('Repository is too large.', [`${repo}#${hash}`]);
+const fileSystem = (path) => newError('Unable to access path.', [path]);
+const cantMakeDir = (path) => newError('Unable to create a directory.', [path]);
+const cantWriteFile = (path) => newError('Unable to write a file.', [path]);
+
+/* istanbul ignore next */
+const color = (code, str) => stdout.isTTY ? `\x1B[1;${code}m${str}\x1B[0m` : str;
+const white = (str) => color(37, str);
+const red = (str) => color(31, str);
+const magenta = (str) => color(35, str);
+const cyan = (str) => color(36, str);
+
+const statusText = (code) => http.STATUS_CODES[code] || 'Unknown';
+const log = (...args) => stdout.write(['  ', ...args, '\n'].join(' '));
+
+module.exports = main().catch(errorHandler);
 
 function errorHandler(error) {
-  logError(red(error.message));
-  error.data && error.data.forEach((line) => logError(line));
+  progressClear();
+
+  log(red(error.message));
+
+  if (error.data) error.data.forEach((line) => log(line));
+
   log();
 
   if (error.withHelp) {
     log('Usage:');
-    log(white('  npx new-app'), magenta('<project> <directory>'));
+    log(white('npx new-app'), magenta('<project> <directory>'));
     log();
   }
 
   log('For help resolving this problem please visit:');
-  log(white(package.bugs.url));
+  log(white(pkg.bugs.url));
   log();
 
   process.exit(1);
@@ -51,134 +66,159 @@ function errorHandler(error) {
 
 async function main() {
   log();
-  log(white(package.name), cyan(package.version));
+  log(white(pkg.name), pkg.version);
   log();
 
   const sourceArg = process.argv[2];
   const destArg = process.argv[3];
 
-  sourceArg || throwError(errors.projectNameRequired());
-  destArg || throwError(errors.desitnationRequired());
+  if (!sourceArg) throwError(projectNameRequired());
+  if (!destArg) throwError(desitnationRequired());
 
   const dest = nodePath.resolve(destArg);
 
-  await exists(dest) && throwError(errors.destinationExists(dest));
-
-  log('Please wait...');
-  log();
+  if (await exists(dest)) throwError(destinationExists(dest));
 
   const sourceParts = sourceArg.split('#').filter((part) => part);
   const repoParts = sourceParts[0].split('/').filter((part) => part);
   const repo = repoParts.slice(0, 2).join('/');
   const repoPath = repoParts.slice(2).join('/');
-  const repoHash = sourceParts.slice(1).join('#');
+  const sourceHash = sourceParts[1];
 
-  const hash = repoHash || await getLatestRelease(repo) || 'master';
-  const files = await getRepoFiles(repo, hash);
-  const filteredFiles = filterFilesByPath(files, repoPath);
+  const hash = sourceHash
+    || await getLatestRelease(repo)
+    || await getDefaultBranch(repo);
 
-  filteredFiles.length || throwError(errors.repoPathNotFound(repo, repoPath));
+  const repoFiles = await getRepoFiles(repo, hash);
+  const files = filterFilesByPath(repoFiles, repoPath);
 
-  await downloadFiles(filteredFiles, dest);
+  if (!repoFiles.length) throwError(repoEmpty(repo, hash));
+  if (!files.length) throwError(repoPathNotFound(repoPath));
 
-  log(cyan(repo), 'has been created in', magenta(dest));
+  await downloadFiles(files, dest);
+
+  log(cyan(repo) + '#' + white(hash), 'has been set up in', magenta(dest));
   log();
 }
 
 async function getLatestRelease(repo) {
-  const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
-  const latestRelease = parseJson(response);
+  const url = `https://api.github.com/repos/${repo}/releases/latest`;
+  const response = await fetch(url);
+  const latestRelease = parseJsonResponse(response, url);
+
   return latestRelease && latestRelease.tag_name;
 }
 
+async function getDefaultBranch(repo) {
+  const url = `https://api.github.com/repos/${repo}`;
+  const response = await fetch(url);
+
+  if (!response) throwError(repoNotFound(repo));
+
+  const repoProps = parseJsonResponse(response, url);
+
+  return repoProps && repoProps.default_branch;
+}
+
 async function getRepoFiles(repo, hash) {
-  const response = await fetch(`https://api.github.com/repos/${repo}/git/trees/${hash}?recursive=1`);
+  const url = `https://api.github.com/repos/${repo}/git/trees/${hash}?recursive=1`
+  const response = await fetch(url);
 
-  response || throwError(errors.repoNotFound(repo, hash));
+  if (!response) throwError(repoHashNotFound(repo, hash));
 
-  const repoFiles = parseJson(response);
+  const repoFiles = parseJsonResponse(response, url);
 
-  repoFiles.truncated && throwError(errors.repoTooBig());
+  if (repoFiles.truncated) throwError(repoTooBig(repo, hash));
 
-  return repoFiles.tree.filter((node) => node.type === 'blob').map((node) => ({
-    path: node.path,
-    url: `https://raw.githubusercontent.com/${repo}/${hash}/${node.path}`,
+  return repoFiles.tree.filter((node) => node.type === 'blob').map((file) => ({
+    path: file.path,
+    url: `https://raw.githubusercontent.com/${repo}/${hash}/${file.path}`,
   }));
 }
 
 async function downloadFiles(files, dest) {
   const queue = [...files];
-  let file;
+  const total = queue.length;
+  progressShow(total);
 
   const worker = async () => {
+    let file;
+
     while(file = queue.pop()) {
       await download(file.url, nodePath.resolve(dest, file.path));
+      progressSet(1 - queue.length / total);
     }
   };
 
   await Promise.all(Array(maxSimultaneouslyDownloads).fill(null).map(worker));
+
+  progressClear();
 }
 
 async function fetch(url) {
-  const response = await request(url);
+  const [found, stream] = await request(url);
+  const data = [];
 
-  if (!response.found || !response.stream) return null;
+  if (!found || !stream) return null;
 
-  let data = [];
+  stream.setEncoding('utf8')
+  stream.on('data', (chunk) => data.push(chunk));
 
-  response.stream.setEncoding('utf8')
-  response.stream.on('data', (chunk) => data.push(chunk));
-
-  await response.promise;
+  await stream.promise;
   return data.join('');
 }
 
 async function download(url, filePath) {
   await makeDirectory(nodePath.dirname(filePath));
-  const response = await request(url);
+  const [found, stream] = await request(url);
 
-  response.found || throwError(errors.serverError(url, 'NotFound'));
+  if (!found) throwError(serverError(url, statusText(404)));
 
   const writeStream = fs.createWriteStream(filePath);
-  writeStream.on('error', () => throwError(errors.cantWriteFile(filePath)));
 
-  if (response.stream) {
-    response.stream.pipe(writeStream);
-    await response.promise;
+  if (stream) {
+    writeStream.on('error', () => stream.reject(cantWriteFile(filePath)));
+    stream.pipe(writeStream);
+    await stream.promise;
   } else {
-    writeStream.end('');
+    writeStream.end();
   }
 }
 
 async function request(url) {
-  const options = Object.assign({}, nodeUrl.parse(url), { headers: {
-    'User-Agent': userAgent,
-    'Accept-Encoding': 'gzip',
-  }});
-
-  const response = await new Promise((resolve, reject) => {
-    return https.get(options, resolve).on('error', () => reject(errors.networkError(url)));
-  });
+  const response = await httpsGet(url);
 
   if (response.statusCode === 200 && response.headers['content-length'] !== '0') {
+    const [resolve, reject, promise] = defer();
     const gunzipStream = zlib.createGunzip();
     const stream = response.pipe(gunzipStream);
 
-    const promise = new Promise((resolve, reject) => {
-      response.on('error', () => reject(errors.networkError(url)));
-      gunzipStream.on('error', () => reject(errors.networkError(url)));
-      stream.on('end', () => resolve(true));
-    });
+    response.on('error', () => reject(networkError(url)));
+    gunzipStream.on('error', () => reject(networkError(url)));
+    stream.on('end', resolve);
+    Object.assign(stream, { promise, resolve, reject });
 
-    return { found: true, stream, promise };
+    return [true, stream];
   }
 
   response.resume();
 
-  if (response.statusCode === 200) return { found: true };
-  if (response.statusCode === 404) return { found: false };
+  if (response.statusCode === 200) return [true, null];
+  if (response.statusCode === 404) return [false, null];
 
-  throwError(errors.serverError(url, response.statusMessage));
+  throwError(serverError(url, statusText(response.statusCode)));
+}
+
+async function httpsGet(url) {
+  const [resolve, reject, promise] = defer();
+  const options = Object.assign(nodeUrl.parse(url), { headers: {
+    'User-Agent': userAgent,
+    'Accept-Encoding': 'gzip',
+  }});
+
+  https.get(options, resolve).on('error', () => reject(networkError(url)));
+
+  return await promise;
 }
 
 async function makeDirectory(path) {
@@ -198,71 +238,86 @@ async function makeDirectory(path) {
   if (!depth) return;
 
   for (let i = depth; i > 0; i--) {
+    const currentPath = paths[i];
+
     try {
-      await mkdir(paths[i - 1]);
+      await nodeUtil.promisify(fs.mkdir)(currentPath);
     } catch(error) {
-      error.code !== 'EEXIST' && throwError(errors.cantMakeDir(path));
+      if (error.code !== 'EEXIST') throwError(cantMakeDir(currentPath));
     }
   }
 }
 
 async function exists(path) {
   try {
-    await stat(nodePath.resolve(path));
+    await nodeUtil.promisify(fs.stat)(nodePath.resolve(path));
     return true;
   } catch(error) {
-    error.code !== 'ENOENT' && throwError(errors.fileSystem(path));
+    if (error.code !== 'ENOENT') throwError(fileSystem(path));
     return false;
   }
 }
 
+/* istanbul ignore next */
+function progressBar(size) {
+  let current = 0;
+
+  const show = () => {
+    if (stdout.isTTY) {
+      stdout.write('\x1B[?25l'); // Hide cursor
+      stdout.write('   (' + ' '.repeat(size) + ')');
+    } else {
+      log('Please wait ...');
+      log();
+    }
+  };
+
+  const clear = () => {
+    if (stdout.isTTY) {
+      stdout.clearLine();
+      stdout.cursorTo(0);
+      stdout.write('\x1B[?25h'); // Show cursor
+    }
+  };
+
+  const set = (value) => {
+    if (stdout.isTTY) {
+      const next = Math.min(Math.round(value * size), size);
+      stdout.cursorTo(current + 4);
+      stdout.write('•'.repeat(next - current));
+      current = next;
+    }
+  };
+
+  return [show, clear, set];
+}
+
 function filterFilesByPath(files, path) {
   const prefix = path ? `${path}/` : '';
-  return files.filter((file) => file.path.startsWith(prefix)).map((file) => ({
+  return files.filter((file) => file.path.startsWith(prefix)).map((file) => Object.assign(file, {
     path: file.path.slice(prefix.length),
-    url: file.url
   }));
 }
 
-function parseJson(str) {
+function parseJsonResponse(str, url) {
   try {
     return JSON.parse(str);
-  } catch(error) {
-    throwError(errors.badData());
+  } catch (error) {
+    throw badData(url);
   }
 }
 
-function white(str) {
-  return '\033[1;37m' + str + '\033[0m';
-}
-
-function red(str) {
-  return '\033[1;31m' + str + '\033[0m';
-}
-
-function magenta(str) {
-  return '\033[1;35m' + str + '\033[0m';
-}
-
-function cyan(str) {
-  return '\033[1;36m' + str + '\033[0m';
-}
-
-function log() {
-  console.log('  ', ...arguments);
-}
-
-function logError() {
-  console.error('  ', ...arguments);
-}
-
-function newError(message, data = [], withHelp = false) {
-  const error = new Error(message);
-  error.data = data;
-  error.withHelp = withHelp;
-  return error;
+function defer() {
+  const control = [];
+  const promise = new Promise((...args) => control.push(...args));
+  return [...control, promise];
 }
 
 function throwError(error) {
   throw error;
+}
+
+function newError(message, data = [], withHelp = false) {
+  const error = new Error(message);
+  return Object.assign(error, { data, withHelp });
 }

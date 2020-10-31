@@ -18,6 +18,7 @@ fi
 
 read -p 'Have you published the release in GitHub?'
 
+npm run test
 npm run build
 
 read -p 'Ready to publish?'
